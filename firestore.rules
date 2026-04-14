@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: profiles
+    // Document ID: userId
+    // Fields:
+    //   - id: string (required) - User's unique ID
+    //   - uid: string (required) - Firebase Auth UID
+    //   - tenantId: string (required) - ID of the tenant the user belongs to
+    //   - email: string (required) - User's email address
+    //   - displayName: string - User's display name
+    //   - role: string (admin, manager, sales, support) - User's role within the tenant
+    //   - photoURL: string - URL to user's profile photo
+    //   - status: string - User's account status
+    //
+    // Collection: tenants
+    // Document ID: tenantId
+    // Fields:
+    //   - id: string (required) - Tenant's unique ID
+    //   - name: string (required) - Tenant's organization name
+    //   - createdAt: string - ISO 8601 creation timestamp
+    //   - plan: string (free, pro, enterprise) - Subscription plan
+    //
+    // [Other collections follow the blueprint structure]
+    //
+    // ===============================================================
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserProfile() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
+    }
+    
+    function isTenantMember(tenantId) {
+      return isAuthenticated() && (
+        // Direct check for owner (tenantId follows tenant_uid pattern)
+        tenantId == 'tenant_' + request.auth.uid ||
+        // Check if user is in the tenant's users subcollection
+        exists(/databases/$(database)/documents/tenants/$(tenantId)/users/$(request.auth.uid)) ||
+        // Fallback to profile check
+        getUserProfile().tenantId == tenantId
+      );
+    }
+
+    function isTenantAdmin(tenantId) {
+      return isTenantMember(tenantId) && (
+        tenantId == 'tenant_' + request.auth.uid ||
+        getUserProfile().role == 'admin'
+      );
+    }
+
+    // Domain Validators
+    function isValidProfile(data) {
+      return data.keys().hasAll(['id', 'tenantId', 'email', 'role']) &&
+             data.id is string && data.tenantId is string &&
+             data.email is string && data.role in ['admin', 'manager', 'sales', 'support'] &&
+             data.id == request.auth.uid;
+    }
+
+    function isValidTenant(data) {
+      return data.keys().hasAll(['id', 'name', 'createdAt', 'plan']) &&
+             data.id is string && data.name is string &&
+             data.plan in ['free', 'pro', 'enterprise'];
+    }
+
+    // Global profiles (to find tenantId)
+    match /profiles/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isAuthenticated() && request.auth.uid == userId && isValidProfile(request.resource.data);
+      allow update: if isAuthenticated() && request.auth.uid == userId && isValidProfile(request.resource.data);
+    }
+
+    // Tenant-scoped data
+    match /tenants/{tenantId} {
+      // Allow creation if authenticated (the first user creates the tenant)
+      allow create: if isAuthenticated() && isValidTenant(request.resource.data);
+      allow read: if isTenantMember(tenantId);
+      allow update, delete: if isTenantAdmin(tenantId) && isValidTenant(request.resource.data);
+
+      match /users/{userId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantAdmin(tenantId) || (isAuthenticated() && request.auth.uid == userId);
+      }
+
+      match /leads/{leadId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /deals/{dealId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /contacts/{contactId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /companies/{companyId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /pipelines/{pipelineId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantAdmin(tenantId);
+      }
+
+      match /tasks/{taskId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /activities/{activityId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /messages/{messageId} {
+        allow read, write: if isTenantMember(tenantId);
+      }
+
+      match /automations/{automationId} {
+        allow read: if isTenantMember(tenantId);
+        allow write: if isTenantAdmin(tenantId);
+      }
+    }
+  }
+}

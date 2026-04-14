@@ -1,0 +1,317 @@
+{
+  "entities": {
+    "Tenant": {
+      "title": "Tenant",
+      "description": "A company or organization using the SaaS platform.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "plan": { "type": "string", "enum": ["free", "pro", "enterprise"] }
+      },
+      "required": ["id", "name", "createdAt", "plan"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user belonging to a tenant.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "manager", "sales", "support"] },
+        "photoURL": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive", "pending"] }
+      },
+      "required": ["id", "tenantId", "email", "role"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "A potential customer or sales lead.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "title": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "companyName": { "type": "string" },
+        "emails": { "type": "array", "items": { "type": "string" } },
+        "phones": { "type": "array", "items": { "type": "string" } },
+        "whatsapp": { "type": "string" },
+        "telegram": { "type": "string" },
+        "website": { "type": "string" },
+        "source": { "type": "string" },
+        "campaign": { "type": "string" },
+        "utmSource": { "type": "string" },
+        "utmMedium": { "type": "string" },
+        "utmCampaign": { "type": "string" },
+        "value": { "type": "number" },
+        "currency": { "type": "string" },
+        "pipelineId": { "type": "string" },
+        "stageId": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "probability": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "converted", "junk"] },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "lastActivityAt": { "type": "string", "format": "date-time" },
+        "nextActivityAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "title", "status", "pipelineId", "stageId"]
+    },
+    "Deal": {
+      "title": "Deal",
+      "description": "A sales opportunity in a pipeline.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "title": { "type": "string" },
+        "pipelineId": { "type": "string" },
+        "stageId": { "type": "string" },
+        "value": { "type": "number" },
+        "currency": { "type": "string" },
+        "probability": { "type": "number" },
+        "assignedTo": { "type": "string" },
+        "contactId": { "type": "string" },
+        "companyId": { "type": "string" },
+        "products": { "type": "array", "items": { "$ref": "ProductItem" } },
+        "discount": { "type": "number" },
+        "tax": { "type": "number" },
+        "total": { "type": "number" },
+        "closingDate": { "type": "string", "format": "date-time" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "title", "pipelineId", "stageId"]
+    },
+    "ProductItem": {
+      "title": "ProductItem",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "quantity": { "type": "number" }
+      }
+    },
+    "Contact": {
+      "title": "Contact",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "companyId": { "type": "string" },
+        "role": { "type": "string" },
+        "emails": { "type": "array", "items": { "type": "string" } },
+        "phones": { "type": "array", "items": { "type": "string" } },
+        "whatsapp": { "type": "string" },
+        "telegram": { "type": "string" },
+        "linkedin": { "type": "string" },
+        "address": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "firstName", "lastName"]
+    },
+    "Company": {
+      "title": "Company",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string" },
+        "industry": { "type": "string" },
+        "employees": { "type": "number" },
+        "revenue": { "type": "number" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "website": { "type": "string" },
+        "vatNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "name"]
+    },
+    "Pipeline": {
+      "title": "Pipeline",
+      "description": "A sales process with multiple stages.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string" },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "color": { "type": "string" },
+              "order": { "type": "number" },
+              "probability": { "type": "number" }
+            }
+          }
+        }
+      },
+      "required": ["id", "tenantId", "name", "stages"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A task assigned to a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "collaborators": { "type": "array", "items": { "type": "string" } },
+        "checklist": { "type": "array", "items": { "$ref": "ChecklistItem" } },
+        "subtasks": { "type": "array", "items": { "type": "string" } },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "in-progress", "completed", "deferred"] },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "comments": { "type": "array", "items": { "$ref": "TaskComment" } },
+        "creatorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "title", "status", "creatorId"]
+    },
+    "ChecklistItem": {
+      "title": "ChecklistItem",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "completed": { "type": "boolean" }
+      }
+    },
+    "TaskComment": {
+      "title": "TaskComment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "An interaction with a lead or contact.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "type": { "type": "string", "enum": ["call", "email", "meeting", "task", "note"] },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "duration": { "type": "number" },
+        "assignedTo": { "type": "string" },
+        "status": { "type": "string", "enum": ["planned", "completed", "cancelled"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "relatedTo": { "type": "string", "enum": ["lead", "deal", "contact", "company"] },
+        "relatedId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "type", "title", "relatedTo", "relatedId"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A chat message.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "channelId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderPhoto": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "channelId", "senderId", "content", "createdAt"]
+    },
+    "Automation": {
+      "title": "Automation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string" },
+        "trigger": { "type": "object" },
+        "actions": { "type": "array", "items": { "type": "object" } },
+        "active": { "type": "boolean" }
+      },
+      "required": ["id", "tenantId", "name", "trigger", "actions"]
+    }
+  },
+  "firestore": {
+    "/tenants/{tenantId}": {
+      "schema": "Tenant",
+      "description": "Tenant organization data."
+    },
+    "/tenants/{tenantId}/users/{userId}": {
+      "schema": "User",
+      "description": "Users belonging to a tenant."
+    },
+    "/tenants/{tenantId}/leads/{leadId}": {
+      "schema": "Lead",
+      "description": "Sales leads."
+    },
+    "/tenants/{tenantId}/deals/{dealId}": {
+      "schema": "Deal",
+      "description": "Sales deals."
+    },
+    "/tenants/{tenantId}/contacts/{contactId}": {
+      "schema": "Contact",
+      "description": "CRM contacts."
+    },
+    "/tenants/{tenantId}/companies/{companyId}": {
+      "schema": "Company",
+      "description": "CRM companies."
+    },
+    "/tenants/{tenantId}/pipelines/{pipelineId}": {
+      "schema": "Pipeline",
+      "description": "Sales pipelines."
+    },
+    "/tenants/{tenantId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tasks."
+    },
+    "/tenants/{tenantId}/activities/{activityId}": {
+      "schema": "Activity",
+      "description": "CRM activities."
+    },
+    "/tenants/{tenantId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Chat messages."
+    },
+    "/tenants/{tenantId}/automations/{automationId}": {
+      "schema": "Automation",
+      "description": "CRM automations."
+    }
+  }
+}
