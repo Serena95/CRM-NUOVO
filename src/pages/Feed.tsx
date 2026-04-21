@@ -1,6 +1,6 @@
 import React from 'react';
 import FeedHeader from '@/components/feed/FeedHeader';
-import CreatePostBox from '@/components/feed/CreatePostBox';
+import { FeedComposer } from '@/components/feed/FeedComposer';
 import FeedList from '@/components/feed/FeedList';
 import { 
   Users, 
@@ -35,7 +35,7 @@ const FeedPage: React.FC = () => {
           
           {/* Main Feed Content */}
           <div className="flex-1 space-y-8">
-            <CreatePostBox />
+            <FeedComposer />
             <FeedList />
           </div>
 

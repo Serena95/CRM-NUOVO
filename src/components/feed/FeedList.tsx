@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { feedService } from '@/services/feedService';
-import { FeedPost } from '@/types';
-import FeedPostCard from './FeedPostCard';
+import { supabaseFeedService } from '@/services/supabaseFeedService';
+import { FeedPost as FeedPostType } from '@/types/feed';
+import { FeedPost } from './FeedPost';
 import { useFeedStore } from '@/stores/feedStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layers, Search, Filter, Loader2 } from 'lucide-react';
@@ -17,17 +17,16 @@ const FeedList: React.FC<{ entityType?: string, entityId?: string }> = ({ entity
     if (!tenant) return;
 
     setIsLoading(true);
-    const unsub = feedService.subscribeToFeed(tenant.id, { 
-      type: activeFilter === 'all' ? null : activeFilter,
-      entityType,
-      entityId
-    }, (data) => {
-      setPosts(data);
+    const unsub = supabaseFeedService.subscribeToPosts((data) => {
+      setPosts(data as any);
       setIsLoading(false);
     });
 
-    return () => unsub();
-  }, [tenant, activeFilter, entityType, entityId]);
+    return () => {
+      if (unsub instanceof Function) unsub();
+      else if (unsub && 'unsubscribe' in unsub) unsub.unsubscribe();
+    };
+  }, [tenant]);
 
   const filteredPosts = posts.filter(post => {
     if (isPinnedOnly) return post.isPinned;
@@ -61,7 +60,7 @@ const FeedList: React.FC<{ entityType?: string, entityId?: string }> = ({ entity
     <div className="space-y-6 pb-20">
       <AnimatePresence mode="popLayout">
         {filteredPosts.map((post) => (
-          <FeedPostCard key={post.id} post={post} />
+          <FeedPost key={post.id} post={post as any} />
         ))}
       </AnimatePresence>
     </div>
