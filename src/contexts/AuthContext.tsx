@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: newTenantId,
             name: `${firebaseUser.displayName || 'My Company'}'s Workspace`,
             createdAt: new Date().toISOString(),
-            plan: 'free'
+            plan: 'enterprise'
           };
           
           const newProfile: UserProfile = {

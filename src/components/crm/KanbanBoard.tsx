@@ -122,23 +122,23 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, items, onAddItem, on
         ></div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-xs text-slate-500 uppercase tracking-widest">{stage.name}</h3>
-            <span className="bg-white shadow-sm text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-100">
+            <h3 className="font-bold text-xs text-brand-gray uppercase tracking-widest">{stage.name}</h3>
+            <span className="bg-white shadow-sm text-brand-gray text-[10px] font-black px-2 py-0.5 rounded-full border border-[#EEEEEE]">
               {items.length}
             </span>
           </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:bg-white">
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-brand-gray hover:bg-white">
             <MoreHorizontal size={14} />
           </Button>
         </div>
         <div className="mt-2">
-          <span className="text-lg font-bold text-slate-900">€{totalValue.toLocaleString()}</span>
+          <span className="text-lg font-black text-brand-blue">€{totalValue.toLocaleString()}</span>
         </div>
       </div>
 
       <div 
         ref={setNodeRef}
-        className="flex-1 bg-slate-200/30 rounded-2xl p-3 overflow-y-auto border border-transparent transition-colors hover:bg-slate-200/50"
+        className="flex-1 bg-brand-bg rounded-[8px] p-3 overflow-y-auto border border-[#EEEEEE] transition-colors hover:bg-brand-bg/80"
       >
         <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
           {items.map((item) => (
@@ -150,7 +150,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, items, onAddItem, on
         
         <Button 
           variant="ghost" 
-          className="w-full justify-center text-blue-500 text-xs h-10 hover:bg-white hover:shadow-sm mt-1 border border-dashed border-blue-200 rounded-xl"
+          className="w-full justify-center text-brand-blue text-xs h-10 hover:bg-white hover:shadow-sm mt-1 border border-dashed border-brand-blue/20 rounded-[8px]"
           onClick={() => onAddItem(stage.id)}
         >
           <Plus size={14} className="mr-2" />

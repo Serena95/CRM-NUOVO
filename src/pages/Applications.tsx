@@ -11,7 +11,7 @@ const Applications: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Applicazioni</h1>
-          <p className="text-slate-500">Estendi le funzionalità di Bitrix24 con app e integrazioni</p>
+          <p className="text-slate-500">Estendi le funzionalità di Nexus con app e integrazioni</p>
         </div>
         <div className="flex items-center gap-2">
           <Button className="bg-[#2FC6F6] hover:bg-[#1eb0e0] text-white rounded-full px-6 font-bold">
@@ -36,7 +36,7 @@ const Applications: React.FC = () => {
         <h2 className="font-bold text-lg text-slate-800">App Installate</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[
-            { name: 'Google Calendar Sync', provider: 'Bitrix24', rating: 4.8, installs: '50k+', icon: 'https://cdn-icons-png.flaticon.com/512/2991/2991147.png' },
+            { name: 'Google Calendar Sync', provider: 'Nexus', rating: 4.8, installs: '50k+', icon: 'https://cdn-icons-png.flaticon.com/512/2991/2991147.png' },
             { name: 'Zoom Integration', provider: 'Zoom Video', rating: 4.5, installs: '120k+', icon: 'https://cdn-icons-png.flaticon.com/512/3670/3670246.png' },
             { name: 'Stripe Payments', provider: 'Stripe', rating: 4.9, installs: '30k+', icon: 'https://cdn-icons-png.flaticon.com/512/5968/5968382.png' },
           ].map((app, i) => (

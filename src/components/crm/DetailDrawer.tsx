@@ -30,6 +30,19 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CRM_PIPELINES } from '@/constants/crm';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import { GitBranch } from 'lucide-react';
 
 interface DetailDrawerProps {
   isOpen: boolean;
@@ -39,7 +52,25 @@ interface DetailDrawerProps {
 }
 
 export const DetailDrawer: React.FC<DetailDrawerProps> = ({ isOpen, onClose, item, type }) => {
+  const { tenant } = useAuth();
   if (!item) return null;
+
+  const handlePipelineChange = async (newPipelineId: string) => {
+    if (!tenant) return;
+    try {
+      const collectionName = type === 'lead' ? 'leads' : 'deals';
+      await updateDoc(doc(db, 'tenants', tenant.id, collectionName, item.id), {
+        pipelineId: newPipelineId,
+        // Reset stage to the first one of the new pipeline if needed
+        // For now just keep the stageId or reset to 'new'
+        stageId: 'new',
+        updatedAt: serverTimestamp()
+      });
+      toast.success(`Spostato nella pipeline: ${CRM_PIPELINES.find(p => p.id === newPipelineId)?.name}`);
+    } catch (error) {
+      toast.error("Errore durante lo spostamento della pipeline");
+    }
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -120,6 +151,40 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({ isOpen, onClose, ite
                     </div>
                   </div>
                 </section>
+
+                {/* Pipeline Section */}
+                {(type === 'lead' || type === 'deal') && (
+                  <section>
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                      <GitBranch size={12} />
+                      Tunnel di Vendita (Pipeline)
+                    </h3>
+                    <div className="space-y-3">
+                      <Label className="text-[10px] font-bold text-slate-400 uppercase">Pipeline Attuale</Label>
+                      <Select 
+                        defaultValue={item.pipelineId || 'GENERALE'} 
+                        onValueChange={handlePipelineChange}
+                      >
+                        <SelectTrigger className="w-full bg-slate-50 border-slate-200 rounded-xl h-10">
+                          <SelectValue placeholder="Seleziona Pipeline" />
+                        </SelectTrigger>
+                        <SelectContent className="z-[110]">
+                          {CRM_PIPELINES.map(p => (
+                            <SelectItem key={p.id} value={p.id}>
+                              <div className="flex items-center gap-2">
+                                <p.icon size={14} className="text-slate-400" />
+                                <span>{p.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-slate-400 leading-relaxed italic">
+                        Spostando l'elemento in un'altra pipeline, lo stato verrà resettato a "Nuovo".
+                      </p>
+                    </div>
+                  </section>
+                )}
 
                 {/* Contact Section */}
                 <section>

@@ -83,11 +83,20 @@ const Chat: React.FC = () => {
     { id: 'support', name: 'Supporto', type: 'channel' },
   ];
 
-  const directMessages = [
-    { id: 'user1', name: 'Marco Rossi', status: 'online' },
-    { id: 'user2', name: 'Giulia Bianchi', status: 'offline' },
-    { id: 'user3', name: 'Luca Verdi', status: 'online' },
-  ];
+  const [directMessages, setDirectMessages] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!tenant) return;
+    const q = query(collection(db, 'tenants', tenant.id, 'users'));
+    const unsub = onSnapshot(q, (snap) => {
+      setDirectMessages(snap.docs.map(doc => ({ 
+        id: doc.id, 
+        name: doc.data().displayName || 'Utente', 
+        status: doc.data().status === 'active' ? 'online' : 'offline' 
+      })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, `tenants/${tenant.id}/users`));
+    return () => unsub();
+  }, [tenant]);
 
   return (
     <div className="h-full flex bg-white overflow-hidden">

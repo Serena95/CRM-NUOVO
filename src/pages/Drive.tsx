@@ -46,7 +46,7 @@ const Drive: React.FC = () => {
       <div className="bg-white border-b border-slate-200 px-8 py-4 shrink-0 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <h1 className="text-xl font-bold text-slate-800">Bitrix Drive</h1>
+            <h1 className="text-xl font-bold text-slate-800">Nexus Drive</h1>
             <div className="flex items-center gap-4">
               {['Mio Drive', 'Drive Comune', 'Documenti Recenti', 'Cestino'].map((tab, i) => (
                 <button

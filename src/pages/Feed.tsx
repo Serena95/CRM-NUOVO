@@ -1,188 +1,125 @@
-import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
+import React from 'react';
+import FeedHeader from '@/components/feed/FeedHeader';
+import CreatePostBox from '@/components/feed/CreatePostBox';
+import FeedList from '@/components/feed/FeedList';
 import { 
-  MessageSquare, 
-  ThumbsUp, 
-  Share2, 
-  MoreHorizontal, 
-  Image as ImageIcon, 
-  Paperclip, 
-  Video, 
-  Smile,
+  Users, 
+  TrendingUp, 
+  Star, 
+  Calendar, 
   Clock,
-  User,
-  Plus
+  Pin,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFeedStore } from '@/stores/feedStore';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
-const Feed: React.FC = () => {
+const FeedPage: React.FC = () => {
   const { profile } = useAuth();
-  const [postText, setPostText] = useState('');
+  const { posts } = useFeedStore();
 
-  const posts = [
-    {
-      id: 1,
-      user: 'Marco Rossi',
-      avatar: '',
-      content: 'Abbiamo appena chiuso il deal con Enterprise Corp! Ottimo lavoro a tutto il team commerciale. 🚀',
-      time: '10 minuti fa',
-      likes: 12,
-      comments: 3,
-      type: 'announcement'
-    },
-    {
-      id: 2,
-      user: 'Giulia Bianchi',
-      avatar: '',
-      content: 'Qualcuno ha il template aggiornato per le proposte commerciali 2024?',
-      time: '1 ora fa',
-      likes: 2,
-      comments: 5,
-      type: 'question'
-    },
-    {
-      id: 3,
-      user: 'Luca Neri',
-      avatar: '',
-      content: 'Nuovo aggiornamento rilasciato per il modulo CRM. Controllate la sezione Automazione per le nuove feature.',
-      time: '3 ore fa',
-      likes: 8,
-      comments: 1,
-      type: 'update'
-    }
+  const sidebarStats = [
+    { label: 'Post totali', value: posts.length, icon: MessageSquare, color: 'text-blue-500' },
+    { label: 'Popolari', value: posts.filter(p => p.likesCount > 5).length, icon: TrendingUp, color: 'text-emerald-500' },
+    { label: 'In evidenza', value: posts.filter(p => p.isPinned).length, icon: Star, color: 'text-amber-500' },
   ];
 
   return (
     <div className="h-full flex flex-col bg-[#f5f7fb]">
-      {/* Feed Header */}
-      <div className="bg-white border-b border-slate-200 px-8 pt-4 shrink-0 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-slate-800">Feed</h1>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="rounded-full px-4 font-bold text-xs border-slate-200">FILTRA</Button>
-            <Button className="bg-[#2FC6F6] hover:bg-[#1eb0e0] text-white font-bold rounded-full px-6 text-xs shadow-lg shadow-blue-200">
-              NUOVO POST
-            </Button>
+      <FeedHeader />
+      
+      <div className="flex-1 overflow-y-auto nexus-scrollbar p-4 lg:p-8">
+        <div className="max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-8">
+          
+          {/* Main Feed Content */}
+          <div className="flex-1 space-y-8">
+            <CreatePostBox />
+            <FeedList />
           </div>
-        </div>
-        
-        <div className="flex items-center gap-8">
-          {['Tutti', 'Annunci', 'Task', 'Sondaggi', 'Altro'].map((tab, i) => (
-            <button
-              key={tab}
-              className={cn(
-                "pb-3 text-sm font-bold transition-all relative",
-                i === 0 ? "text-blue-500" : "text-slate-400 hover:text-slate-600"
-              )}
-            >
-              {tab}
-              {i === 0 && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-full"></div>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      <div className="flex-1 p-8 overflow-auto">
-        <div className="max-w-3xl mx-auto space-y-6">
-          {/* Create Post */}
-          <Card className="border-none shadow-sm rounded-2xl overflow-hidden">
-            <CardContent className="p-0">
-              <div className="p-4 border-b border-slate-50">
-                <div className="flex gap-4">
-                  <Avatar className="h-10 w-10 shrink-0">
-                    <AvatarImage src={profile?.photoURL} />
-                    <AvatarFallback className="bg-blue-500 text-white">{profile?.displayName?.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <textarea 
-                    placeholder="Cosa c'è di nuovo?"
-                    className="w-full bg-transparent border-none focus:ring-0 text-sm resize-none py-2 min-h-[80px]"
-                    value={postText}
-                    onChange={(e) => setPostText(e.target.value)}
+          {/* Right Sidebar - Desktop Only */}
+          <div className="w-full lg:w-80 shrink-0 space-y-6 hidden lg:block">
+            {/* User Quick Stats */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="px-3 py-1 bg-brand-blue/10 text-brand-blue rounded-full text-[10px] font-black uppercase tracking-widest">
+                  Il tuo profilo
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="relative">
+                  <img 
+                    src={profile?.photoURL} 
+                    className="w-16 h-16 rounded-2xl object-cover shadow-lg" 
+                    alt="" 
+                    referrerPolicy="no-referrer"
                   />
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-2 border-white rounded-full" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-800 tracking-tight leading-tight uppercase">
+                    {profile?.displayName}
+                  </h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                    {profile?.role}
+                  </p>
                 </div>
               </div>
-              <div className="px-4 py-3 bg-slate-50/50 flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="text-slate-400 hover:text-blue-500 h-8 w-8">
-                    <ImageIcon size={18} />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="text-slate-400 hover:text-blue-500 h-8 w-8">
-                    <Paperclip size={18} />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="text-slate-400 hover:text-blue-500 h-8 w-8">
-                    <Video size={18} />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="text-slate-400 hover:text-blue-500 h-8 w-8">
-                    <Smile size={18} />
-                  </Button>
-                </div>
-                <Button 
-                  disabled={!postText.trim()}
-                  className="bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-full px-6 text-xs shadow-md shadow-blue-200"
-                >
-                  INVIA
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Posts List */}
-          {posts.map((post) => (
-            <Card key={post.id} className="border-none shadow-sm rounded-2xl overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-slate-100 text-slate-500 text-xs font-bold">
-                        {post.user.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-800">{post.user}</h3>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
-                        <Clock size={10} />
-                        <span>{post.time}</span>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Post</span>
+                  <span className="text-xl font-black text-slate-800">{posts.filter(p => p.authorId === profile?.uid).length}</span>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Commenti</span>
+                  <span className="text-xl font-black text-slate-800">12</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Filters */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+              <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
+                Stats piattaforma
+              </h4>
+              <div className="space-y-4">
+                {sidebarStats.map((stat, i) => (
+                  <div key={i} className="flex items-center justify-between group cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className={cn("p-2 rounded-lg bg-slate-50 group-hover:bg-white transition-colors", stat.color)}>
+                        <stat.icon size={16} />
                       </div>
+                      <span className="text-sm font-bold text-slate-600 group-hover:text-brand-blue transition-colors">
+                        {stat.label}
+                      </span>
                     </div>
+                    <span className="text-sm font-black text-slate-400">{stat.value}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="text-slate-300 hover:text-slate-600 h-8 w-8">
-                    <MoreHorizontal size={18} />
-                  </Button>
-                </div>
+                ))}
+              </div>
+            </div>
 
-                <div className="text-sm text-slate-600 leading-relaxed mb-6">
-                  {post.content}
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                  <div className="flex items-center gap-4">
-                    <button className="flex items-center gap-1.5 text-slate-400 hover:text-blue-500 transition-colors group">
-                      <ThumbsUp size={16} className="group-hover:scale-110 transition-transform" />
-                      <span className="text-xs font-bold">{post.likes}</span>
-                    </button>
-                    <button className="flex items-center gap-1.5 text-slate-400 hover:text-blue-500 transition-colors group">
-                      <MessageSquare size={16} className="group-hover:scale-110 transition-transform" />
-                      <span className="text-xs font-bold">{post.comments}</span>
-                    </button>
-                  </div>
-                  <button className="flex items-center gap-1.5 text-slate-400 hover:text-blue-500 transition-colors group">
-                    <Share2 size={16} className="group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-bold uppercase tracking-widest">Condividi</span>
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+            {/* Birthday / Events placeholder */}
+            <div className="bg-gradient-to-br from-brand-blue to-blue-600 rounded-2xl p-6 shadow-xl shadow-blue-100 text-white relative overflow-hidden group">
+              <div className="relative z-10">
+                <h4 className="text-[11px] font-black opacity-60 uppercase tracking-[0.2em] mb-2"> Prossimi Eventi</h4>
+                <p className="text-sm font-bold leading-snug">
+                  Nessun evento in programma per oggi. 
+                </p>
+                <button className="mt-4 text-[10px] font-black uppercase tracking-widest bg-white/20 hover:bg-white/30 px-4 py-2 rounded-full transition-all">
+                  Vedi calendario
+                </button>
+              </div>
+              <Calendar className="absolute -right-4 -bottom-4 w-24 h-24 opacity-10 group-hover:scale-110 transition-transform" />
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default Feed;
+export default FeedPage;

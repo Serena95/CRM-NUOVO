@@ -20,6 +20,10 @@ import Applications from '@/pages/Applications';
 import Automations from '@/pages/Automations';
 import Analytics from '@/pages/Analytics';
 import Login from '@/pages/Login';
+import LandingPage from '@/pages/LandingPage';
+import BusinessModule from '@/pages/BusinessModule';
+import QuoteModule from '@/pages/QuoteModule';
+import NexusIndex from '@/pages/NexusIndex';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Plus } from 'lucide-react';
@@ -27,7 +31,8 @@ import { Button } from '@/components/ui/button';
 
 const App: React.FC = () => {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState('feed');
+  const [activeTab, setActiveTab] = useState('dashboard-home');
+  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
     async function testConnection() {
@@ -47,19 +52,22 @@ const App: React.FC = () => {
       <div className="h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-medium animate-pulse">Initializing BitrixClone...</p>
+          <p className="text-slate-500 font-medium animate-pulse">Initializing Nexus...</p>
         </div>
       </div>
     );
   }
 
   if (!user) {
-    return (
-      <>
-        <Login />
-        <Toaster />
-      </>
-    );
+    if (showLogin) {
+      return (
+        <>
+          <Login onBack={() => setShowLogin(false)} />
+          <Toaster position="top-right" />
+        </>
+      );
+    }
+    return <LandingPage onLogin={() => setShowLogin(true)} />;
   }
 
   const renderContent = () => {
@@ -81,9 +89,14 @@ const App: React.FC = () => {
       case 'companies':
       case 'activities':
       case 'pipelines':
+      case 'pipeline-settings':
       case 'quotes':
       case 'invoices':
       case 'crm':
+      case 'preventivi':
+      case 'finanza-agevolata':
+      case 'servizi-digitali':
+      case 'ai-agente':
         return <CRM activeTab={activeTab} />;
       case 'tasks':
       case 'tasks-my':
@@ -147,12 +160,26 @@ const App: React.FC = () => {
       case 'apps-marketplace':
       case 'apps-integrations':
         return <Applications />;
+      case 'nexus-general':
+      case 'nexus-finanza':
+      case 'nexus-digitale':
+      case 'nexus-consulenze':
+      case 'nexus-eventi':
+      case 'nexus-prodotti':
+      case 'nexus-formazione':
+      case 'nexus-coworking':
+      case 'nexus-prenotazioni':
+      case 'nexus-economie':
+        return <CRM activeTab={activeTab} />;
       case 'settings':
       case 'settings-users':
       case 'settings-roles':
       case 'settings-permissions':
         return <Settings />;
       default:
+        if (activeTab.startsWith('pipeline-') || activeTab.startsWith('nexus-')) {
+          return <CRM activeTab={activeTab} />;
+        }
         return (
           <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-white m-8 rounded-3xl shadow-sm border border-slate-100">
             <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 mb-6">
@@ -160,7 +187,7 @@ const App: React.FC = () => {
             </div>
             <h2 className="text-2xl font-bold text-slate-800">Modulo in Sviluppo</h2>
             <p className="text-slate-500 max-w-md mt-2">
-              Stiamo lavorando per portare tutte le funzionalità di Bitrix24 su questa piattaforma. 
+              Stiamo lavorando per portare tutte le funzionalità necessarie su questa piattaforma. 
               Il modulo <span className="font-bold text-blue-500 uppercase">"{activeTab}"</span> sarà disponibile a breve.
             </p>
             <Button 

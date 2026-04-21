@@ -266,9 +266,259 @@
         "active": { "type": "boolean" }
       },
       "required": ["id", "tenantId", "name", "trigger", "actions"]
+    },
+    "NexusClient": {
+      "title": "NexusClient",
+      "description": "Main Nexus Client record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "name"]
+    },
+    "NexusRecord": {
+      "title": "NexusRecord",
+      "description": "Generic record for Nexus sub-modules.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "value": { "type": "number" },
+        "status": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "clientId", "title"]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "Sales quote/estimate.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "cliente_id": { "type": "string" },
+        "azienda_id": { "type": "string" },
+        "deal_id": { "type": "string" },
+        "titolo": { "type": "string" },
+        "descrizione": { "type": "string" },
+        "stato": { "type": "string", "enum": ["bozza", "inviato", "accettato", "rifiutato"] },
+        "totale": { "type": "number" },
+        "valuta": { "type": "string" },
+        "data_creazione": { "type": "string", "format": "date-time" },
+        "data_scadenza": { "type": "string", "format": "date-time" },
+        "prodotti": { "type": "array", "items": { "$ref": "QuoteItem" } },
+        "servizi": { "type": "array", "items": { "$ref": "QuoteItem" } },
+        "note": { "type": "string" },
+        "termini_pagamento": { "type": "string" },
+        "iban": { "type": "string" },
+        "validita": { "type": "string" },
+        "allegati": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "tenantId", "cliente_id", "titolo", "stato", "totale"]
+    },
+    "QuoteItem": {
+      "title": "QuoteItem",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "price": { "type": "number" },
+        "discount": { "type": "number" },
+        "tax": { "type": "number" },
+        "total": { "type": "number" }
+      }
+    },
+    "NexusPreventivo": {
+      "title": "NexusPreventivo",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "cliente_nome": { "type": "string" },
+        "cliente_indirizzo": { "type": "string" },
+        "cliente_piva": { "type": "string" },
+        "cliente_email": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "totale_complessivo": { "type": "number" },
+        "data_creazione": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "cliente_nome", "items", "totale_complessivo"]
+    },
+    "SocialUser": {
+      "title": "SocialUser",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "bio": { "type": "string" },
+        "followersCount": { "type": "number" },
+        "followingCount": { "type": "number" },
+        "postsCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "username", "displayName"]
+    },
+    "SocialPost": {
+      "title": "SocialPost",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "type": { "type": "string", "enum": ["text", "image", "video", "poll", "ad"] },
+        "content": { "type": "string" },
+        "mediaUrls": { "type": "array", "items": { "type": "string" } },
+        "link": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isPinned": { "type": "boolean" },
+        "isSponsored": { "type": "boolean" },
+        "pollId": { "type": "string" },
+        "score": { "type": "number" }
+      },
+      "required": ["id", "userId", "type", "createdAt"]
+    },
+    "SocialPoll": {
+      "title": "SocialPoll",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "options": { "type": "array", "items": { "$ref": "PollOption" } },
+        "totalVotes": { "type": "number" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "question", "options", "createdBy"]
+    },
+    "PollOption": {
+      "title": "PollOption",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "votes": { "type": "number" }
+      },
+      "required": ["id", "text", "votes"]
+    },
+    "SocialComment": {
+      "title": "SocialComment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "postId": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "text": { "type": "string" },
+        "parentId": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "postId", "userId", "text", "createdAt"]
+    },
+    "SocialNotification": {
+      "title": "SocialNotification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "recipientId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "type": { "type": "string", "enum": ["like", "comment", "reply", "follow", "poll_vote", "ad_update"] },
+        "targetId": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "recipientId", "type", "createdAt"]
+    },
+    "FeedPost": {
+      "title": "FeedPost",
+      "description": "Activity stream post.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "content": { "type": "string" },
+        "contentHtml": { "type": "string" },
+        "type": { "type": "string", "enum": ["post", "task", "crm_activity", "deal_update", "lead_created", "system", "announcement"] },
+        "entityType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "mentions": { "type": "array", "items": { "type": "string" } },
+        "attachments": { "type": "array", "items": { "type": "object" } },
+        "reactions": { "type": "object" },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "isPinned": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "tenantId", "authorId", "type", "createdAt"]
+    },
+    "FeedComment": {
+      "title": "FeedComment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "postId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "content": { "type": "string" },
+        "parentId": { "type": "string" },
+        "mentions": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "postId", "authorId", "content", "createdAt"]
     }
   },
   "firestore": {
+    "/social_users/{userId}": {
+      "schema": "SocialUser",
+      "description": "Social media user profiles."
+    },
+    "/social_posts/{postId}": {
+      "schema": "SocialPost",
+      "description": "Feed posts."
+    },
+    "/social_polls/{pollId}": {
+      "schema": "SocialPoll",
+      "description": "Interactive polls."
+    },
+    "/social_comments/{commentId}": {
+      "schema": "SocialComment",
+      "description": "Threaded comments."
+    },
+    "/social_notifications/{notifId}": {
+      "schema": "SocialNotification",
+      "description": "User notifications."
+    },
+    "/social_followers/{id}": {
+      "schema": "object",
+      "description": "Relationship between users (follower_id + following_id)."
+    },
+    "/social_likes/{id}": {
+      "schema": "object",
+      "description": "Likes on posts and comments."
+    },
+    "/social_saved/{id}": {
+      "schema": "object",
+      "description": "Saved posts by user."
+    },
     "/tenants/{tenantId}": {
       "schema": "Tenant",
       "description": "Tenant organization data."
@@ -312,6 +562,62 @@
     "/tenants/{tenantId}/automations/{automationId}": {
       "schema": "Automation",
       "description": "CRM automations."
+    },
+    "/tenants/{tenantId}/client_records/{clientId}": {
+      "schema": "NexusClient",
+      "description": "Nexus Clients."
+    },
+    "/tenants/{tenantId}/nexus_finanza/{id}": {
+      "schema": "NexusRecord",
+      "description": "Finanza Agevolata records."
+    },
+    "/tenants/{tenantId}/nexus_digitale/{id}": {
+      "schema": "NexusRecord",
+      "description": "Digitale records."
+    },
+    "/tenants/{tenantId}/nexus_consulenze/{id}": {
+      "schema": "NexusRecord",
+      "description": "Consulenze records."
+    },
+    "/tenants/{tenantId}/nexus_eventi/{id}": {
+      "schema": "NexusRecord",
+      "description": "Organizzazione Eventi records."
+    },
+    "/tenants/{tenantId}/nexus_prodotti/{id}": {
+      "schema": "NexusRecord",
+      "description": "Prodotti e servizi records."
+    },
+    "/tenants/{tenantId}/nexus_formazione/{id}": {
+      "schema": "NexusRecord",
+      "description": "Formazione records."
+    },
+    "/tenants/{tenantId}/nexus_coworking/{id}": {
+      "schema": "NexusRecord",
+      "description": "Coworking records."
+    },
+    "/tenants/{tenantId}/nexus_prenotazioni/{id}": {
+      "schema": "NexusRecord",
+      "description": "Prenotazioni Online records."
+    },
+    "/tenants/{tenantId}/nexus_economie/{id}": {
+      "schema": "NexusRecord",
+      "description": "Economie Nexus records."
+    },
+    "/tenants/{tenantId}/quotes/{quoteId}": {
+      "schema": "Quote",
+      "description": "Sales quotes."
+    },
+    "/tenants/{tenantId}/nexus_preventivi/{id}": {
+      "schema": "NexusPreventivo",
+      "description": "Nexus specific quotes."
+    },
+    "/tenants/{tenantId}/feed_posts/{postId}": {
+      "schema": "FeedPost",
+      "description": "Activity feed posts."
+    },
+    "/tenants/{tenantId}/feed_comments/{commentId}": {
+      "schema": "FeedComment",
+      "description": "Activity feed comments."
     }
   }
 }
