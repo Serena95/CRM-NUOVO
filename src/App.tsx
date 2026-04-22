@@ -31,8 +31,14 @@ import { Button } from '@/components/ui/button';
 
 const App: React.FC = () => {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard-home');
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('nexus_active_tab') || 'dashboard-home';
+  });
   const [showLogin, setShowLogin] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('nexus_active_tab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     async function testConnection() {
@@ -84,7 +90,8 @@ const App: React.FC = () => {
       case 'dashboard-pipeline':
         return <Dashboard activeTab={activeTab} />;
       case 'leads':
-      case 'deals':
+      case 'affari':
+      case 'deals': // backward compatibility
       case 'contacts':
       case 'companies':
       case 'activities':
@@ -96,8 +103,15 @@ const App: React.FC = () => {
       case 'preventivi':
       case 'finanza-agevolata':
       case 'servizi-digitali':
+      case 'consulenze':
+      case 'economie':
+      case 'organizzazione-eventi':
+      case 'prodotti-e-servizi':
+      case 'formazione':
+      case 'coworking':
+      case 'prenotazione-online':
       case 'ai-agente':
-        return <CRM activeTab={activeTab} />;
+        return <CRM activeTab={activeTab} setActiveTab={setActiveTab} />;
       case 'tasks':
       case 'tasks-my':
       case 'tasks-all':
@@ -170,7 +184,7 @@ const App: React.FC = () => {
       case 'nexus-coworking':
       case 'nexus-prenotazioni':
       case 'nexus-economie':
-        return <CRM activeTab={activeTab} />;
+        return <CRM activeTab={activeTab} setActiveTab={setActiveTab} />;
       case 'settings':
       case 'settings-users':
       case 'settings-roles':
@@ -178,7 +192,7 @@ const App: React.FC = () => {
         return <Settings />;
       default:
         if (activeTab.startsWith('pipeline-') || activeTab.startsWith('nexus-')) {
-          return <CRM activeTab={activeTab} />;
+          return <CRM activeTab={activeTab} setActiveTab={setActiveTab} />;
         }
         return (
           <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-white m-8 rounded-3xl shadow-sm border border-slate-100">

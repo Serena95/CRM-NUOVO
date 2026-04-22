@@ -22,7 +22,8 @@ import {
   Copy, 
   FileSignature,
   ExternalLink,
-  ChevronLeft
+  ChevronLeft,
+  TrendingUp
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -166,98 +167,137 @@ const QuoteModule: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 p-8 overflow-auto">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              {filteredQuotes.length} Preventivi trovati
-            </span>
-          </div>
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Titolo</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cliente</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Totale</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Stato</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
-                <th className="px-6 py-4"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filteredQuotes.map((quote) => (
-                <tr key={quote.id} className="hover:bg-slate-50/30 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500">
-                        <FileText size={16} />
-                      </div>
-                      <span className="font-bold text-slate-700">{quote.titolo}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-medium text-slate-600">
-                        {clients.find(c => c.id === quote.cliente_id)?.name || 'Cliente Nexus'}
-                      </p>
-                      {quote.azienda_id && (
-                        <p className="text-[10px] text-slate-400 uppercase font-bold">
-                          {companies.find(c => c.id === quote.azienda_id)?.name}
-                        </p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-black text-slate-800">
-                    {quote.totale.toFixed(2)} {quote.valuta}
-                  </td>
-                  <td className="px-6 py-4">
-                    {getStatusBadge(quote.stato)}
-                  </td>
-                  <td className="px-6 py-4 text-xs text-slate-400">
-                    {quote.data_creazione ? new Date(quote.data_creazione.seconds * 1000).toLocaleDateString() : '--'}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => handleDownloadPDF(quote)}
-                        className="h-8 w-8 text-blue-500 hover:bg-blue-50"
-                        title="Scarica PDF"
-                      >
-                        <Download size={16} />
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-800">
-                            <MoreHorizontal size={16} />
+      <div className="flex-1 p-4 lg:p-8 overflow-auto">
+        <div className="max-w-[1400px] mx-auto space-y-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/10">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                {filteredQuotes.length} Preventivi trovati
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] font-bold text-slate-400 uppercase">Sistema Online</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left min-w-[800px]">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-16">#</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Stato</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Titolo</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cliente</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Totale</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
+                    <th className="px-6 py-4"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredQuotes.map((quote, index) => (
+                    <tr key={quote.id} className="hover:bg-slate-50/30 transition-colors group">
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-[10px] font-black text-slate-300">{(index + 1).toString().padStart(2, '0')}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {getStatusBadge(quote.stato)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500 shrink-0">
+                            <FileText size={16} />
+                          </div>
+                          <span className="font-bold text-slate-700 truncate max-w-[200px]">{quote.titolo}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-bold text-slate-700 truncate">
+                            {clients.find(c => c.id === quote.cliente_id)?.name || 'Cliente Nexus'}
+                          </p>
+                          {quote.azienda_id && (
+                            <p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">
+                              {companies.find(c => c.id === quote.azienda_id)?.name}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-black text-slate-800">
+                        {quote.totale.toFixed(2)} {quote.valuta}
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-400 font-medium">
+                        {quote.data_creazione ? new Date(quote.data_creazione.seconds * 1000).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '--'}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDownloadPDF(quote)}
+                            className="h-8 w-8 text-blue-500 hover:bg-blue-50"
+                            title="Scarica PDF"
+                          >
+                            <Download size={16} />
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => { setSelectedQuote(quote); setIsEditorOpen(true); }}>
-                            <FileSignature size={14} className="mr-2" /> Modifica
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDuplicate(quote)}>
-                            <Copy size={14} className="mr-2" /> Duplica
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(quote.id)}>
-                            <Trash2 size={14} className="mr-2" /> Elimina
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredQuotes.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400 italic text-sm">
-                    Nessun preventivo trovato.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-800">
+                                <MoreHorizontal size={16} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => { setSelectedQuote(quote); setIsEditorOpen(true); }}>
+                                <FileSignature size={14} className="mr-2" /> Modifica
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDuplicate(quote)}>
+                                <Copy size={14} className="mr-2" /> Duplica
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteId(quote.id)}>
+                                <Trash2 size={14} className="mr-2" /> Elimina
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredQuotes.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-20 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-200">
+                            <Plus size={24} className="rotate-45" />
+                          </div>
+                          <span className="text-sm text-slate-400 font-medium italic">Nessun preventivo trovato nel archivio.</span>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Totale Emesso</span>
+                <span className="text-2xl font-black text-slate-800 tracking-tight">€{filteredQuotes.reduce((a, b) => a + b.totale, 0).toLocaleString()}</span>
+             </div>
+             <div className="bg-emerald-500 p-6 rounded-2xl border border-emerald-400 shadow-xl shadow-emerald-100 text-white">
+                <span className="text-[10px] font-black opacity-80 uppercase tracking-widest block mb-2">Preventivi Accettati</span>
+                <span className="text-2xl font-black tracking-tight">{filteredQuotes.filter(q => q.stato === 'accettato').length}</span>
+             </div>
+             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Efficienza Conversion</span>
+                  <span className="text-2xl font-black text-slate-800 tracking-tight">
+                    {filteredQuotes.length > 0 ? ((filteredQuotes.filter(q => q.stato === 'accettato').length / filteredQuotes.length) * 100).toFixed(1) : 0}%
+                  </span>
+                </div>
+                <div className="h-10 w-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-500">
+                  <TrendingUp size={20} />
+                </div>
+             </div>
+          </div>
         </div>
       </div>
 

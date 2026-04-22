@@ -1,683 +1,321 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
+import { useCRMStore } from '@/stores/crmStore';
+import { supabaseCRMService } from '@/services/supabaseCRMService';
+import { CRMStructuresSelector } from '@/components/crm/CRMStructuresSelector';
+import { KanbanBoard } from '@/components/crm/Kanban/KanbanBoard';
+import { toast } from 'sonner';
 import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  doc,
-  serverTimestamp 
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { useAuth } from '@/contexts/AuthContext';
-import { Deal, Lead, Pipeline, PipelineStage, Contact, Company } from '@/types';
+  BarChart3, 
+  Settings, 
+  Plus, 
+  Search, 
+  Filter,
+  Users2,
+  Building,
+  Target,
+  Zap,
+  Download,
+  MoreHorizontal,
+  Activity
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Plus, Search, Filter, Grid, List as ListIcon, Download, MoreHorizontal, ClipboardCheck, GitBranch, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Input } from '@/components/ui/input';
-import { KanbanBoard } from '@/components/crm/KanbanBoard';
-import { LeadCard, DealCard } from '@/components/crm/CRMCards';
-import { DetailDrawer } from '@/components/crm/DetailDrawer';
-import { CreateItemModal } from '@/components/crm/CreateItemModal';
-import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
-import { CRM_PIPELINES, DEFAULT_STAGES } from '@/constants/crm';
-import { processNewDeal } from '@/services/automationService';
-import PipelineSettings from './PipelineSettings';
-import FinanzaAgevolataForm from '@/components/crm/FinanzaAgevolataForm';
-import ServiziDigitaliForm from '@/components/crm/ServiziDigitaliForm';
-import BusinessModule from './BusinessModule';
-import QuoteModule from './QuoteModule';
-import Analytics from './Analytics';
-import Automations from './Automations';
-import ChatAgente from '@/components/crm/ChatAgente';
 
-const CRM: React.FC<{ activeTab?: string }> = ({ activeTab: propActiveTab }) => {
-  const { tenant } = useAuth();
-  const [activeTab, setActiveTab] = useState('leads');
-  const [selectedArea, setSelectedArea] = useState<string>('GENERALE');
-
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
-  
-  // Data States
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [quotes, setQuotes] = useState<any[]>([]);
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [activePipeline, setActivePipeline] = useState<Pipeline | null>(null);
+const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }> = ({ activeTab: propActiveTab, setActiveTab }) => {
+  const { fetchInitialData, isLoading, structures, activeStructure, switchStructure, error, unsubscribeFromChanges } = useCRMStore();
+  const [activeViewTab, setActiveViewTab] = useState('affari');
 
   useEffect(() => {
+    // Force set default if no specific tab or if it's generic 'crm'
+    if (!propActiveTab || propActiveTab === 'crm') {
+      setActiveViewTab('affari');
+    }
+    fetchInitialData(propActiveTab);
+    return () => unsubscribeFromChanges();
+  }, [propActiveTab]);
+
+  if (error) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-white m-8 rounded-3xl shadow-sm border border-rose-100">
+        <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mb-6">
+          <Settings size={40} className="animate-spin-slow" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">Errore di Sincronizzazione</h2>
+        <p className="text-slate-500 max-w-md mt-2 font-medium">
+          Non siamo riusciti a connetterci al database o inizializzare le strutture CRM. 
+          Assicurati di aver configurato correttamente Supabase e di aver eseguito lo schema SQL.
+        </p>
+        <div className="bg-rose-50 p-4 rounded-xl mt-6 font-mono text-[10px] text-rose-600 max-w-lg overflow-auto border border-rose-100">
+          Error Log: {error}
+        </div>
+        <Button 
+          onClick={() => fetchInitialData(undefined, true)}
+          className="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full px-8 py-6 h-auto"
+        >
+          RIPROVA INIZIALIZZAZIONE
+        </Button>
+      </div>
+    );
+  }
+
+  useLayoutEffect(() => {
     if (propActiveTab) {
-      const tab = propActiveTab === 'crm' ? 'leads' : propActiveTab;
-      setActiveTab(tab);
-      
-      if (tab.startsWith('pipeline-')) {
-        const pId = tab.replace('pipeline-', '');
-        setSelectedArea(pId);
-        const p = pipelines.find(pip => pip.id === pId);
-        if (p) setActivePipeline(p);
+      if (propActiveTab.startsWith('nexus-') || propActiveTab === 'finanza-agevolata' || propActiveTab === 'servizi-digitali') {
+        const slug = propActiveTab.startsWith('nexus-') ? propActiveTab.replace('nexus-', '') : propActiveTab;
+        const struct = structures.find(s => s.slug === slug || s.slug === slug.replace('-', ' '));
+        if (struct) {
+          switchStructure(struct);
+          setActiveViewTab('affari');
+        }
+      } else {
+        const tabMap: Record<string, string> = {
+          'affari': 'affari',
+          'deals': 'affari',
+          'crm': 'affari',
+          'leads': 'leads',
+          'contacts': 'contatti',
+          'companies': 'aziende',
+          'analytics': 'analytics',
+          'activities': 'analytics',
+          'preventivi': 'affari'
+        };
+        const targetTab = tabMap[propActiveTab];
+        if (targetTab && activeViewTab !== targetTab) {
+          setActiveViewTab(targetTab);
+        }
       }
     }
-  }, [propActiveTab, pipelines]);
+  }, [propActiveTab, structures]);
 
-  useEffect(() => {
-    if (!pipelines.length) return;
-    
-    // Try to find the pipeline in the fetched pipelines from Firestore
-    let p = pipelines.find(pip => pip.id === selectedArea);
-    
-    // Fallback: If not found in Firestore, check if it matches by name (case insensitive)
-    if (!p) {
-      const areaDef = CRM_PIPELINES.find(def => def.id === selectedArea);
-      if (areaDef) {
-        p = pipelines.find(pip => 
-          pip.name.toLowerCase().includes(areaDef.name.toLowerCase())
-        );
-      }
-    }
-
-    // Final Fallback: Use the definition from constants with default stages
-    if (!p) {
-      const def = CRM_PIPELINES.find(pip => pip.id === selectedArea);
-      if (def) {
-        p = {
-          ...def,
-          stages: DEFAULT_STAGES,
-          tenantId: tenant?.id || '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        } as Pipeline;
-      }
-    }
-    
-    if (p) setActivePipeline(p);
-  }, [selectedArea, pipelines, tenant]);
-  
-  useEffect(() => {
-    const handleOpenCreate = (e: any) => {
-      setCreateType(e.detail.type);
-      setIsCreateModalOpen(true);
-    };
-    window.addEventListener('crm:openCreate', handleOpenCreate as any);
-    return () => window.removeEventListener('crm:openCreate', handleOpenCreate as any);
-  }, []);
-
-  // UI States
-  const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [createType, setCreateType] = useState<'lead' | 'deal' | 'contact' | 'company'>('lead');
-  const [showFinanzaForm, setShowFinanzaForm] = useState(true);
-  const [showDigitalForm, setShowDigitalForm] = useState(true);
-  const [isAuthReady, setIsAuthReady] = useState(false);
-
-  const tabs = React.useMemo(() => {
-    const baseTabs = [
-      { id: 'leads', label: 'Lead', badge: leads.length },
-      { id: 'deals', label: 'Affari', badge: deals.length },
-      { id: 'contacts', label: 'Contatti', badge: contacts.length },
-      { id: 'companies', label: 'Aziende', badge: companies.length },
-      { id: 'preventivi', label: 'Preventivi' },
-      { id: 'ai-agente', label: 'AI Agente' },
-      { id: 'activities', label: 'Attività' },
-      { id: 'analytics', label: 'Analisi' },
-      { id: 'automation', label: 'Automazione' },
-    ];
-
-    if (activeTab.startsWith('nexus-') && !baseTabs.find(t => t.id === activeTab)) {
-      const nexusLabels: Record<string, string> = {
-        'nexus-finanza': 'Finanza Agevolata',
-        'nexus-digitale': 'Servizi Digitali',
-        'nexus-consulenze': 'Consulenze',
-        'nexus-economie': 'Economie',
-        'nexus-eventi': 'Organizzazione Eventi',
-        'nexus-prodotti': 'Prodotti e Servizi',
-        'nexus-formazione': 'Formazione',
-        'nexus-coworking': 'Coworking',
-        'nexus-prenotazioni': 'Prenotazioni Online',
-        'nexus-preventivi': 'Preventivi Nexus',
-        'nexus-general': 'Anagrafica Clienti'
-      };
-      
-      baseTabs.push({ 
-        id: activeTab, 
-        label: nexusLabels[activeTab] || activeTab.replace('nexus-', '').toUpperCase() 
-      });
-    }
-
-    return baseTabs;
-  }, [leads.length, deals.length, contacts.length, companies.length, quotes.length, activeTab]);
-
-  // Scroll refs for navigation
-  const tabsRef = React.useRef<HTMLDivElement>(null);
-  const pipelinesRef = React.useRef<HTMLDivElement>(null);
-  const [canScrollTabs, setCanScrollTabs] = useState({ left: false, right: false });
-  const [canScrollPipelines, setCanScrollPipelines] = useState({ left: false, right: false });
-
-  const checkScroll = (ref: React.RefObject<HTMLDivElement>, setter: React.Dispatch<React.SetStateAction<{ left: boolean, right: boolean }>>) => {
-    if (ref.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = ref.current;
-      const left = scrollLeft > 0;
-      const right = scrollLeft < scrollWidth - clientWidth - 1;
-      
-      setter(prev => {
-        if (prev.left === left && prev.right === right) return prev;
-        return { left, right };
-      });
-    }
-  };
-
-  useEffect(() => {
-    const checkAll = () => {
-      checkScroll(tabsRef, setCanScrollTabs);
-      checkScroll(pipelinesRef, setCanScrollPipelines);
-    };
-    
-    // Initial check
-    checkAll();
-    
-    // Check after a small delay to ensure DOM is ready
-    const timer = setTimeout(checkAll, 100);
-    
-    window.addEventListener('resize', checkAll);
-    return () => {
-      window.removeEventListener('resize', checkAll);
-      clearTimeout(timer);
-    };
-  }, [tabs.length, CRM_PIPELINES.length, activeTab, selectedArea]);
-
-  const scroll = (ref: React.RefObject<HTMLDivElement>, direction: 'left' | 'right') => {
-    if (ref.current) {
-      const scrollAmount = 200;
-      ref.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (!tenant) return;
-
-    // Fetch Pipelines
-    const unsubPipelines = onSnapshot(collection(db, 'tenants', tenant.id, 'pipelines'), (snap) => {
-      const pips = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pipeline));
-      setPipelines(pips);
-      if (pips.length > 0 && !activePipeline) {
-        setActivePipeline(pips[0]);
-      }
-    }, (error) => handleFirestoreError(error, OperationType.LIST, `tenants/${tenant.id}/pipelines`));
-
-    // Fetch Leads
-    const unsubLeads = onSnapshot(collection(db, 'tenants', tenant.id, 'leads'), (snap) => {
-      setLeads(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lead)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, `tenants/${tenant.id}/leads`));
-
-    // Fetch Deals
-    const unsubDeals = onSnapshot(collection(db, 'tenants', tenant.id, 'deals'), (snap) => {
-      setDeals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Deal)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, `tenants/${tenant.id}/deals`));
-
-    // Fetch Contacts
-    const unsubContacts = onSnapshot(collection(db, 'tenants', tenant.id, 'contacts'), (snap) => {
-      setContacts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contact)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, `tenants/${tenant.id}/contacts`));
-
-    // Fetch Companies
-    const unsubCompanies = onSnapshot(collection(db, 'tenants', tenant.id, 'companies'), (snap) => {
-      setCompanies(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company)));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, `tenants/${tenant.id}/companies`));
-
-    // Fetch Quotes for badge
-    const unsubQuotes = onSnapshot(collection(db, 'tenants', tenant.id, 'quotes'), (snap) => {
-      setQuotes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => handleFirestoreError(error, OperationType.LIST, `tenants/${tenant.id}/quotes`));
-
-    return () => {
-      unsubPipelines();
-      unsubLeads();
-      unsubDeals();
-      unsubContacts();
-      unsubCompanies();
-      unsubQuotes();
-    };
-  }, [tenant]);
-
-  const handleItemMove = async (itemId: string, newStageId: string) => {
-    if (!tenant) return;
-    const collectionName = activeTab === 'leads' ? 'leads' : 'deals';
-    const itemRef = doc(db, 'tenants', tenant.id, collectionName, itemId);
-    await updateDoc(itemRef, { 
-      stageId: newStageId,
-      updatedAt: serverTimestamp()
-    });
-  };
-
-  const addItem = async (stageId: string) => {
-    if (!tenant) return;
-    const collectionName = activeTab === 'leads' ? 'leads' : 'deals';
-    const dealData = {
-      tenantId: tenant.id,
-      title: `Nuovo ${activeTab === 'leads' ? 'Lead' : 'Affare'}`,
-      pipelineId: activePipeline?.id || 'default',
-      stageId: stageId,
-      value: Math.floor(Math.random() * 5000) + 500,
-      status: activeTab === 'leads' ? 'active' : undefined,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-    
-    const docRef = await addDoc(collection(db, 'tenants', tenant.id, collectionName), dealData);
-    
-    if (collectionName === 'deals') {
-      await processNewDeal(tenant.id, docRef.id, dealData);
-    }
-  };
-
-  const handleItemClick = (item: any) => {
-    setSelectedItem(item);
-    setIsDrawerOpen(true);
-  };
-
-  const currentDeals = activeTab === 'deals' || activeTab.startsWith('pipeline-')
-    ? deals.filter(d => d.pipelineId === selectedArea)
-    : deals;
-
-  const currentLeads = activeTab === 'leads'
-    ? leads.filter(l => l.pipelineId === selectedArea || !l.pipelineId)
-    : leads;
-
-  const getPipelineColor = () => {
-    if (!activePipeline) return '#3b82f6';
-    const p = CRM_PIPELINES.find(pip => pip.id === activePipeline.id);
-    return p?.color || '#3b82f6';
-  };
+  const tabs = [
+    { id: 'leads', label: 'Lead', icon: Users2 },
+    { id: 'affari', label: 'Affari', icon: Target },
+    { id: 'contatti', label: 'Contatti', icon: Users2 },
+    { id: 'aziende', label: 'Aziende', icon: Building },
+    { id: 'analytics', label: 'Analisi', icon: BarChart3 },
+    { id: 'automazioni', label: 'Automazioni', icon: Zap },
+    { id: 'configurazione', label: 'Configurazione', icon: Settings },
+  ];
 
   return (
-    <div className="h-full flex flex-col bg-[#f5f7fb] overflow-hidden w-full max-w-full relative">
-      {/* CRM Header (Consolidated & Responsive) */}
-      <div className="bg-white border-b border-slate-200 shrink-0 shadow-sm z-20 w-full overflow-visible">
-        {/* Top Row: Context & Primary Actions */}
-        <div className="px-4 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 overflow-visible">
-          <div className="flex items-center gap-3 lg:gap-8 overflow-visible flex-1">
-            <div className="flex flex-col shrink-0 min-w-0">
-              <h1 className="text-lg lg:text-2xl font-black text-brand-blue uppercase tracking-tighter leading-none truncate">
-                {activeTab === 'leads' ? 'Lead' : activeTab === 'deals' ? 'Affari' : 'CRM'}
-              </h1>
-              <span className="text-[10px] lg:text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-1 truncate max-w-[150px] sm:max-w-none">
-                {activePipeline?.name.replace(/^[0-9.]+\s*/, '') || 'GENERALE'}
-              </span>
-            </div>
+    <div className="h-full flex flex-col bg-[#f5f7fb] overflow-hidden relative">
+      {/* Bitrix Style Header */}
+      <div className="bg-white border-b border-slate-200 shrink-0 shadow-sm z-30">
+        <div className="px-6 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-[14px] font-medium text-slate-400 capitalize">CRM / </span>
+            <span className="text-[14px] font-black text-slate-800 uppercase tracking-tight">
+              {tabs.find(t => t.id === activeViewTab)?.label || 'Affari'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-9 w-9 rounded-full text-blue-500 hover:bg-blue-50 bg-blue-50/50"
+                  title="Simula Invio Form Google"
+                >
+                  <Zap size={18} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[280px] p-2 rounded-xl shadow-2xl border-slate-100">
+                <div className="px-3 py-2 border-b border-slate-50 mb-1">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Simulazione Ingresso</span>
+                </div>
+                <DropdownMenuItem 
+                  onClick={async () => {
+                    const payload = {
+                      company: "AgriTech Innovative",
+                      name: "Elena Verdi",
+                      phone: "+39 333 9876543",
+                      email: "elena@agritech.it",
+                      type: "Credito d'Imposta 4.0",
+                      budget: 150000,
+                      service: "Finanza Agevolata",
+                      notes: "Interessata a bando ministeriale",
+                      expectedValue: 150000
+                    };
+                    try {
+                      await supabaseCRMService.processFormSubmission(payload, 'https://forms.gle/RBigx9gHGJ5pEJeS6');
+                      await fetchInitialData();
+                      toast.success("Lead inviato alla Pipeline Finanza!");
+                    } catch (e) { toast.error("Errore simulazione"); }
+                  }}
+                  className="p-3 cursor-pointer rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-black text-slate-700 uppercase">Bando Finanza Agevolata</span>
+                    <span className="text-[9px] text-slate-400">forms.gle/RBigx9gHGJ5p...</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={async () => {
+                    const payload = {
+                      company: "Digital Bloom Agency",
+                      name: "Luca Bianchi",
+                      phone: "+39 347 1122334",
+                      email: "luca@digitalbloom.com",
+                      type: "Rifacimento Sito Web SEO",
+                      budget: 12000,
+                      service: "Digital Marketing",
+                      notes: "Richiesta preventivo urgente",
+                      expectedValue: 12000
+                    };
+                    try {
+                      await supabaseCRMService.processFormSubmission(payload, 'https://forms.gle/kUaGCoJcW7uYZU44A');
+                      await fetchInitialData();
+                      toast.success("Lead inviato alla Pipeline Digital!");
+                    } catch (e) { toast.error("Errore simulazione"); }
+                  }}
+                  className="p-3 cursor-pointer rounded-lg hover:bg-orange-50 transition-colors"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-black text-slate-700 uppercase">Servizi Digitali</span>
+                    <span className="text-[9px] text-slate-400">forms.gle/kUaGCoJcW7uY...</span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
-            <Button 
+            <Button className="bg-[#2FC6F6] hover:bg-[#1eb0e0] text-white font-black rounded-full px-6 h-10 text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100">
+              <Plus size={16} className="mr-2" /> 
+              NUOVO AFFARE
+            </Button>
+          </div>
+        </div>
+
+        {/* Sub-navigation bar (Tabs style like Bitrix top bar) */}
+        <div className="px-6 flex items-center gap-8 border-t border-slate-50">
+           {tabs.map((tab) => (
+            <button
+              key={tab.id}
               onClick={() => {
-                const type = activeTab === 'leads' ? 'lead' : (activeTab === 'deals' || activeTab.startsWith('pipeline-')) ? 'deal' : activeTab === 'contacts' ? 'contact' : 'company';
-                setCreateType(type as any);
-                setIsCreateModalOpen(true);
+                setActiveViewTab(tab.id);
+                // Update global state too so refresh works correctly
+                setActiveTab(tab.id);
               }}
-              className="font-black rounded-full px-4 lg:px-6 h-9 lg:h-10 text-[9px] lg:text-[11px] uppercase tracking-widest shadow-lg text-white transition-all hover:scale-105 active:scale-95 bg-brand-blue hover:bg-brand-blue/90 shrink-0"
-            >
-              <Plus size={14} className="mr-1 lg:mr-2" />
-              <span className="hidden xs:inline">NUOVO {activeTab === 'leads' ? 'LEAD' : (activeTab === 'deals' || activeTab.startsWith('pipeline-')) ? 'AFFARE' : activeTab === 'contacts' ? 'CONTATTO' : 'AZIENDA'}</span>
-              <span className="xs:hidden">NUOVO</span>
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-2 lg:gap-3 shrink-0 self-end sm:self-auto">
-            <div className="relative group w-40 sm:w-64 hidden xs:block">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-blue transition-colors" size={12} />
-              <Input 
-                placeholder="Cerca..." 
-                className="pl-9 bg-slate-50 border-none shadow-inner h-8 rounded-full text-xs focus-visible:ring-2 focus-visible:ring-brand-blue/30 w-full"
-              />
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-400 hover:bg-slate-100">
-                <Download size={14} />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-400 hover:bg-slate-100">
-                <Settings size={14} />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Middle Row: Navigation Tabs */}
-        <div className="px-4 lg:px-8 flex items-center justify-between border-t border-slate-50 relative group/tabs bg-white overflow-hidden">
-          <div className="relative flex-1 overflow-hidden flex items-center h-12 lg:h-14">
-            <AnimatePresence>
-              {canScrollTabs.left && (
-                <button 
-                  onClick={() => scroll(tabsRef, 'left')}
-                  className="absolute left-0 z-10 h-full px-2 bg-gradient-to-r from-white via-white to-transparent text-slate-400 hover:text-brand-blue transition-all"
-                >
-                  <ChevronLeft size={16} />
-                </button>
+              className={cn(
+                "py-3 text-[11px] font-black uppercase tracking-[0.15em] relative transition-all",
+                activeViewTab === tab.id ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
               )}
-            </AnimatePresence>
-
-            <div 
-              ref={tabsRef}
-              onScroll={() => checkScroll(tabsRef, setCanScrollTabs)}
-              className="flex items-center gap-6 lg:gap-10 h-full overflow-x-auto no-scrollbar scroll-smooth"
             >
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    "h-full text-[11px] lg:text-[13px] font-black transition-all relative whitespace-nowrap uppercase tracking-[0.12em] lg:tracking-[0.15em] flex items-center",
-                    activeTab === tab.id 
-                      ? "text-blue-600" 
-                      : "text-slate-600 hover:text-slate-900"
-                  )}
-                >
-                  {tab.label}
-                  {tab.badge !== undefined && (
-                    <span className="ml-2 bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-black">
-                      {tab.badge}
-                    </span>
-                  )}
-                  {activeTab === tab.id && (
-                    <motion.div 
-                      layoutId="activeTab"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-blue rounded-full" 
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
-
-            <AnimatePresence>
-              {canScrollTabs.right && (
-                <button 
-                  onClick={() => scroll(tabsRef, 'right')}
-                  className="absolute right-0 z-10 h-full px-2 bg-gradient-to-l from-white via-white to-transparent text-slate-400 hover:text-brand-blue transition-all"
-                >
-                  <ChevronRight size={16} />
-                </button>
+              <div className="flex items-center gap-2">
+                <tab.icon size={14} />
+                {tab.label}
+              </div>
+              {activeViewTab === tab.id && (
+                <motion.div 
+                  layoutId="crmActiveTab"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full"
+                />
               )}
-            </AnimatePresence>
-          </div>
-
-          <div className="hidden lg:flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100 my-1.5 ml-6 shrink-0">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={cn("h-7 w-7 rounded-md", viewMode === 'kanban' ? "bg-white shadow-sm text-brand-blue" : "text-slate-400")}
-              onClick={() => setViewMode('kanban')}
-            >
-              <Grid size={14} />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={cn("h-7 w-7 rounded-md", viewMode === 'list' ? "bg-white shadow-sm text-brand-blue" : "text-slate-400")}
-              onClick={() => setViewMode('list')}
-            >
-              <ListIcon size={14} />
-            </Button>
-          </div>
-        </div>
-
-        {/* Bottom Row: Pipeline Switcher (Nexus Style) */}
-        <div className="bg-slate-100/80 px-4 lg:px-8 py-2 flex items-center gap-2 border-t border-slate-200 backdrop-blur-sm relative group/pipelines overflow-hidden">
-          <div className="flex items-center gap-1.5 mr-2 shrink-0">
-            <GitBranch size={14} className="text-slate-500" />
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest hidden sm:inline">Area:</span>
-          </div>
-
-          <div className="relative flex-1 overflow-hidden flex items-center h-10">
-            <AnimatePresence>
-              {canScrollPipelines.left && (
-                <button 
-                  onClick={() => scroll(pipelinesRef, 'left')}
-                  className="absolute left-0 z-10 h-full px-2 bg-gradient-to-r from-slate-100 via-slate-100 to-transparent text-slate-500 hover:text-brand-blue transition-all"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-              )}
-            </AnimatePresence>
-
-            <div 
-              ref={pipelinesRef}
-              onScroll={() => checkScroll(pipelinesRef, setCanScrollPipelines)}
-              className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth h-full py-1"
-            >
-              {CRM_PIPELINES.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedArea(p.id)}
-                  className={cn(
-                    "px-4 py-1.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border shadow-sm shrink-0",
-                    selectedArea === p.id 
-                      ? "bg-white text-brand-blue border-brand-blue/30 ring-2 ring-brand-blue/10" 
-                      : "bg-white/60 text-slate-600 border-slate-200 hover:text-slate-900 hover:bg-white"
-                  )}
-                >
-                  {p.name.replace(/^[0-9.]+\s*/, '')}
-                </button>
-              ))}
-            </div>
-
-            <AnimatePresence>
-              {canScrollPipelines.right && (
-                <button 
-                  onClick={() => scroll(pipelinesRef, 'right')}
-                  className="absolute right-0 z-10 h-full px-2 bg-gradient-to-l from-slate-100 via-slate-100 to-transparent text-slate-500 hover:text-brand-blue transition-all"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              )}
-            </AnimatePresence>
-          </div>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* CRM Content Area */}
-      <div className="flex-1 overflow-hidden flex flex-col relative w-full max-w-full">
-        {/* Filters Bar */}
-        <div className="px-4 lg:px-8 py-2 bg-white/50 border-b border-slate-100 flex items-center justify-between shrink-0 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-3 lg:gap-4 shrink-0">
-            <Button variant="ghost" size="sm" className="h-7 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:bg-white shrink-0">
-              <Filter size={10} className="mr-2" /> FILTRI
+      {/* Main CRM Workspace */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Interaction Bar (Bitrix Style) */}
+        <div className="px-6 py-3 bg-[#eef2f7] border-b border-slate-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4">
+            <CRMStructuresSelector />
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => fetchInitialData(activeStructure?.slug, true)}
+              className="h-9 text-[10px] font-black text-blue-600 uppercase tracking-widest bg-white shadow-sm border border-slate-200 px-4 rounded-md hover:bg-blue-50 transition-colors"
+              title="Aggiorna dati"
+            >
+              <Activity size={14} className="mr-2" /> AGGIORNA
             </Button>
-            <div className="h-3 w-px bg-slate-200"></div>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
-              {activeTab === 'leads' ? leads.length : deals.length} elementi
-            </span>
+
+            <Button variant="ghost" size="sm" className="h-9 text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white shadow-sm border border-slate-200 px-4 rounded-md hover:bg-slate-50 transition-colors">
+              <Filter size={14} className="mr-2 text-blue-500" /> FILTRI
+            </Button>
+
+            <div className="relative group w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              <Input 
+                placeholder="Cerca in questa pipeline..." 
+                className="pl-9 bg-white border-slate-200 h-9 rounded-md text-xs focus-visible:ring-1 focus-visible:ring-blue-400"
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button variant="ghost" size="sm" className="h-7 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:bg-white shrink-0">
-              <Download size={10} className="mr-2" /> ESPORTA
+
+          <div className="flex items-center gap-2">
+             <div className="flex bg-slate-200/50 p-1 rounded-lg">
+               <button className="px-4 py-1.5 bg-white shadow-sm rounded-md text-[10px] font-black text-blue-600 uppercase tracking-widest transition-all">Kanban</button>
+               <button className="px-4 py-1.5 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-slate-700 transition-all">Elenco</button>
+             </div>
+             
+             <div className="h-6 w-[1px] bg-slate-300 mx-2" />
+
+             <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 bg-white border border-slate-200 shadow-sm">
+              <Download size={15} />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 bg-white border border-slate-200 shadow-sm">
+              <MoreHorizontal size={15} />
             </Button>
           </div>
         </div>
 
-        <div className={cn(
-          "flex-1 overflow-auto w-full max-w-full",
-          activeTab === 'leads' || activeTab === 'deals' || activeTab.startsWith('pipeline-') || activeTab === 'contacts' || activeTab === 'companies' 
-            ? "p-4 lg:p-8" 
-            : "p-0"
-        )}>
-          {activeTab === 'pipeline-settings' ? (
-            <PipelineSettings />
-          ) : activeTab === 'leads' && selectedArea === 'FINANZA_AGEVOLATA' && showFinanzaForm ? (
-            <div className="space-y-6 max-w-full p-4 lg:p-8">
-              <div className="flex justify-end overflow-x-auto no-scrollbar py-1">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowFinanzaForm(false)}
-                  className="rounded-full border-slate-200 text-slate-500 font-bold text-[10px] sm:text-xs shrink-0"
-                >
-                  <Grid size={14} className="mr-2" /> PASSA ALLA GESTIONE LEAD
-                </Button>
-              </div>
-              <FinanzaAgevolataForm />
-            </div>
-          ) : activeTab === 'leads' && selectedArea === 'DIGITALE' && showDigitalForm ? (
-            <div className="space-y-6 max-w-full p-4 lg:p-8">
-              <div className="flex justify-end overflow-x-auto no-scrollbar py-1">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowDigitalForm(false)}
-                  className="rounded-full border-slate-200 text-slate-500 font-bold text-[10px] sm:text-xs shrink-0"
-                >
-                  <Grid size={14} className="mr-2" /> PASSA ALLA GESTIONE LEAD
-                </Button>
-              </div>
-              <ServiziDigitaliForm />
-            </div>
-          ) : activeTab === 'analytics' ? (
-            <Analytics />
-          ) : activeTab === 'automation' ? (
-            <Automations />
-          ) : activePipeline && (activeTab === 'leads' || activeTab === 'deals' || activeTab.startsWith('pipeline-')) ? (
-            <div className="space-y-4 max-w-full overflow-x-auto p-4 lg:p-8 pb-4">
-              {activeTab === 'leads' && selectedArea === 'FINANZA_AGEVOLATA' && (
-                <div className="flex justify-end overflow-x-auto no-scrollbar">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowFinanzaForm(true)}
-                    className="rounded-full border-slate-200 text-slate-500 font-bold text-[10px] sm:text-xs shrink-0"
-                  >
-                    <ClipboardCheck size={14} className="mr-2" /> TORNA AL FORM DI QUALIFICAZIONE
-                  </Button>
+        {/* Kanban Area */}
+        <div className="flex-1 overflow-hidden flex flex-col relative">
+          <AnimatePresence mode="wait">
+            {isLoading && structures.length === 0 && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-[60] bg-white/40 backdrop-blur-[1px] flex items-center justify-center pointer-events-none"
+              >
+                <div className="bg-white/80 p-6 rounded-2xl shadow-2xl border border-slate-100 flex flex-col items-center gap-4">
+                  <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sincronizzazione in corso...</span>
                 </div>
-              )}
-              {activeTab === 'leads' && selectedArea === 'DIGITALE' && (
-                <div className="flex justify-end overflow-x-auto no-scrollbar">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowDigitalForm(true)}
-                    className="rounded-full border-slate-200 text-slate-500 font-bold text-[10px] sm:text-xs shrink-0"
-                  >
-                    <ClipboardCheck size={14} className="mr-2" /> TORNA AL FORM DI QUALIFICAZIONE
-                  </Button>
-                </div>
-              )}
-              <KanbanBoard 
-                stages={activePipeline.stages}
-              items={activeTab === 'leads' ? currentLeads : currentDeals}
-              onItemMove={handleItemMove}
-              onAddItem={addItem}
-              onItemClick={handleItemClick}
-              renderCard={(item) => activeTab === 'leads' ? <LeadCard lead={item} /> : <DealCard deal={item} />}
-            />
-          </div>
-        ) : activeTab === 'contacts' ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-x-auto max-w-full">
-              <table className="w-full text-left min-w-[600px]">
-                <thead>
-                  <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Email</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Telefono</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Azienda</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Creato il</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {contacts.map((contact) => (
-                    <tr key={contact.id} className="hover:bg-slate-50/30 transition-colors group cursor-pointer" onClick={() => handleItemClick(contact)}>
-                      <td className="px-6 py-4 font-bold text-slate-700 whitespace-nowrap">{contact.firstName} {contact.lastName}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{contact.emails?.[0] || '--'}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{contact.phones?.[0] || '--'}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{contact.companyId || '--'}</td>
-                      <td className="px-6 py-4 text-xs text-slate-400 whitespace-nowrap">{contact.createdAt ? new Date(contact.createdAt).toLocaleDateString() : '--'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : activeTab === 'companies' ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-x-auto max-w-full">
-              <table className="w-full text-left min-w-[600px]">
-                <thead>
-                  <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Azienda</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Industria</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Email</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Sito Web</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Creato il</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {companies.map((company) => (
-                    <tr key={company.id} className="hover:bg-slate-50/30 transition-colors group cursor-pointer" onClick={() => handleItemClick(company)}>
-                      <td className="px-6 py-4 font-bold text-slate-700 whitespace-nowrap">{company.name}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{company.industry || '--'}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{company.email || '--'}</td>
-                      <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{company.website || '--'}</td>
-                      <td className="px-6 py-4 text-xs text-slate-400 whitespace-nowrap">{company.createdAt ? new Date(company.createdAt).toLocaleDateString() : '--'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : activeTab === 'preventivi' || activeTab === 'nexus-preventivi' || activeTab === 'quotes' ? (
-            <div className="h-full">
-              <QuoteModule />
-            </div>
-          ) : activeTab === 'nexus-finanza' || activeTab === 'finanza-agevolata' ? (
-            <div className="h-full bg-white rounded-2xl p-8 overflow-auto">
-              <FinanzaAgevolataForm />
-            </div>
-          ) : activeTab === 'nexus-digitale' || activeTab === 'servizi-digitali' ? (
-            <div className="h-full bg-white rounded-2xl p-8 overflow-auto">
-              <ServiziDigitaliForm />
-            </div>
-          ) : activeTab === 'ai-agente' ? (
-            <div className="h-full bg-white rounded-2xl overflow-hidden">
-              <ChatAgente clientId="general" />
-            </div>
-          ) : activeTab === 'analytics' || activeTab === 'crm-analytics' ? (
-            <div className="h-full -m-8">
-              <Analytics />
-            </div>
-          ) : activeTab === 'automation' ? (
-            <div className="h-full -m-8">
-              <Automations />
-            </div>
-          ) : activeTab.startsWith('nexus-') ? (
-            <div className="h-full -m-8">
-              <BusinessModule 
-                sectionId={activeTab.replace('nexus-', '')} 
-                title={tabs.find(t => t.id === activeTab)?.label || 'Modulo Business'} 
-              />
-            </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {activeViewTab === 'affari' ? (
+            <KanbanBoard key="kanban" />
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 bg-brand-blue/10 rounded-full flex items-center justify-center text-brand-blue mb-6">
+            <motion.div 
+              key="fallback"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex-1 flex flex-col items-center justify-center text-center p-20"
+            >
+              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-blue-300 mb-6">
                 <Plus size={40} className="rotate-45" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800">Modulo in Sviluppo</h2>
-              <p className="text-slate-500 max-w-md mt-2">
-                Stiamo lavorando per portare tutte le funzionalità necessarie su questa piattaforma. 
-                Il modulo <span className="font-bold text-brand-blue uppercase">"{activeTab}"</span> sarà disponibile a breve.
+              <h2 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">Modulo in fase di sviluppo</h2>
+              <p className="text-slate-500 max-w-md mt-2 font-medium">
+                Siamo attualmente impegnati nell'implementazione di questa sezione per offrirti un'esperienza CRM completa in stile Bitrix24.
               </p>
-            </div>
+              <Button 
+                onClick={() => setActiveViewTab('affari')}
+                className="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full px-8"
+              >
+                VAI AGLI AFFARI
+              </Button>
+            </motion.div>
           )}
         </div>
       </div>
-
-      {/* Detail Drawer */}
-      <DetailDrawer 
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        item={selectedItem}
-        type={activeTab === 'leads' ? 'lead' : activeTab === 'deals' ? 'deal' : activeTab === 'contacts' ? 'contact' : 'company'}
-      />
-
-      <CreateItemModal 
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        type={createType}
-        pipelineId={activePipeline?.id}
-      />
     </div>
   );
 };

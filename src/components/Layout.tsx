@@ -105,13 +105,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [pipelineCounts, setPipelineCounts] = useState<Record<string, number>>({});
 
-  React.useEffect(() => {
-    if (tenant) {
-      initializePipelines(tenant.id);
-      const unsub = getPipelineCounts(tenant.id, setPipelineCounts);
-      return () => unsub();
-    }
-  }, [tenant]);
+  // React.useEffect(() => {
+  //   if (tenant) {
+  //     initializePipelines(tenant.id);
+  //     const unsub = getPipelineCounts(tenant.id, setPipelineCounts);
+  //     return () => unsub();
+  //   }
+  // }, [tenant]);
 
   const toggleMenu = (id: string) => {
     setExpandedMenus(prev => 
@@ -237,13 +237,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
     ]},
     { id: 'crm', label: 'CRM', icon: Briefcase, subItems: [
       { id: 'leads', label: 'Lead', icon: UserPlus },
-      { id: 'deals', label: 'Affari', icon: DollarSign },
+      { id: 'affari', label: 'Affari', icon: DollarSign },
       { id: 'contacts', label: 'Contatti', icon: Users },
       { id: 'companies', label: 'Aziende', icon: Building },
       { id: 'preventivi', label: 'Preventivi', icon: FileEdit },
       { id: 'activities', label: 'Attività', icon: Activity },
-      { id: 'pipeline-settings', label: 'Pipeline e tunnel di vendita', icon: GitBranch },
-      { id: 'invoices', label: 'Fatture', icon: FileCheck },
     ]},
     { id: 'tasks', label: 'Task e progetti', icon: CheckSquare, subItems: [
       { id: 'tasks-my', label: 'I miei task', icon: CheckSquare },
@@ -276,17 +274,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       { id: 'apps-marketplace', label: 'Marketplace app', icon: Store },
       { id: 'apps-integrations', label: 'Integrazioni', icon: Layers },
     ]},
-    { id: 'business-units', label: 'Nexus Business', icon: Briefcase, subItems: [
-      { id: 'nexus-finanza', label: 'Finanza Agevolata', icon: DollarSign },
-      { id: 'nexus-digitale', label: 'Servizi Digitali', icon: Globe },
-      { id: 'nexus-consulenze', label: 'Consulenze', icon: Info },
-      { id: 'nexus-economie', label: 'Economie', icon: TrendingUp },
-      { id: 'nexus-eventi', label: 'Organizzazione Eventi', icon: CalendarIcon },
-      { id: 'nexus-prodotti', label: 'Prodotti e servizi', icon: Store },
-      { id: 'nexus-formazione', label: 'Formazione', icon: UserCog },
-      { id: 'nexus-coworking', label: 'Coworking', icon: Users2 },
-      { id: 'nexus-prenotazioni', label: 'Prenotazioni Online', icon: Smartphone },
-    ]},
     { id: 'settings', label: 'Impostazioni', icon: Settings, subItems: [
       { id: 'settings-users', label: 'Utenti', icon: Users },
       { id: 'settings-roles', label: 'Ruoli', icon: ShieldCheck },
@@ -318,6 +305,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
               onClick={() => {
                 if (item.subItems) {
                   toggleMenu(item.id);
+                  if (item.id === 'crm' && activeTab !== 'affari') {
+                    setActiveTab('affari');
+                  }
                 } else {
                   setActiveTab(item.id);
                   setIsSidebarOpen(false);
