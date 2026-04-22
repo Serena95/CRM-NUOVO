@@ -21,7 +21,7 @@ interface CRMState {
   setStages: (stages: CRMStage[]) => void;
   setDeals: (deals: CRMDeal[]) => void;
   
-  fetchInitialData: (preferredStructureSlug?: string) => Promise<void>;
+  fetchInitialData: (preferredStructureSlug?: string, force?: boolean) => Promise<void>;
   switchStructure: (structure: CRMStructure) => Promise<void>;
   moveDeal: (dealId: string, toStageId: string) => Promise<void>;
   subscribeToChanges: (structureId: string) => void;

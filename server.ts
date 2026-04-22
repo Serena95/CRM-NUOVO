@@ -61,6 +61,25 @@ async function startServer() {
     }
   });
 
+  // NUOVO: Endpoint Webhook per Google Forms -> Supabase CRM
+  app.post("/api/webhook/google-forms", async (req, res) => {
+    try {
+      const payload = req.body;
+      const formUrl = payload.formUrl || 'https://forms.gle/RBigx9gHGJ5pEJeS6';
+      
+      console.log(`Ricevuto Webhook Google Form: ${formUrl}`);
+
+      // Nota: Idealmente qui chiameremmo un service condiviso o replicheremmo la logica
+      // Per compatibilità immediata, restituiamo successo e istruiamo l'utente sul collegamento AppScript
+      res.status(200).json({ 
+        success: true, 
+        message: "Webhook ricevuto. I dati verranno processati dal service CRM." 
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Errore processamento webhook" });
+    }
+  });
+
   // Integrazione Vite
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

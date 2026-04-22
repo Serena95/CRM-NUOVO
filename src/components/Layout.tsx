@@ -71,8 +71,6 @@ import {
 } from 'lucide-react';
 import ChatAgente from './crm/ChatAgente';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CRM_PIPELINES } from '@/constants/crm';
-import { initializePipelines, getPipelineCounts } from '@/services/crmService';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -103,15 +101,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['crm', 'tasks']);
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-  const [pipelineCounts, setPipelineCounts] = useState<Record<string, number>>({});
-
-  // React.useEffect(() => {
-  //   if (tenant) {
-  //     initializePipelines(tenant.id);
-  //     const unsub = getPipelineCounts(tenant.id, setPipelineCounts);
-  //     return () => unsub();
-  //   }
-  // }, [tenant]);
 
   const toggleMenu = (id: string) => {
     setExpandedMenus(prev => 

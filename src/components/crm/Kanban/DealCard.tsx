@@ -39,8 +39,8 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
     borderLeftColor: structure?.color || '#cbd5e1'
   };
 
-  if (isPreanalysis && deal.form_result) {
-    const res = deal.form_result;
+  if (isPreanalysis && deal.preanalysis_result) {
+    const res = deal.preanalysis_result;
     return (
       <div
         ref={setNodeRef}
@@ -61,32 +61,19 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
               {structure?.name}
             </span>
           </div>
-          <Badge className={cn(
-            "text-[10px] font-black uppercase px-2 py-0.5 shadow-none border-none",
-            res.result === 'Positivo' ? "bg-emerald-100 text-emerald-700" :
-            res.result === 'Dubbio' ? "bg-amber-100 text-amber-700" :
-            "bg-rose-100 text-rose-700"
-          )}>
-            Preanalisi completata
+          <Badge className="bg-blue-50 text-blue-600 text-[10px] font-black uppercase px-2 py-0.5 border-none shadow-none">
+            {res.score}%
           </Badge>
         </div>
 
-        <div className="grid grid-cols-2 gap-y-2 gap-x-4">
+        <div className="space-y-2">
           <div className="flex items-center gap-2 text-[11px] text-slate-600 font-bold overflow-hidden">
             <User size={12} className="text-slate-400 shrink-0" />
             <span className="truncate">{res.contact_data.name}</span>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-blue-600 font-bold overflow-hidden">
-            <TrendingUp size={12} className="shrink-0" />
-            <span className="truncate">€{res.budget.toLocaleString()}</span>
-          </div>
-          <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium font-mono">
+          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
             <Phone size={12} className="text-slate-400 shrink-0" />
             <span>{res.contact_data.phone}</span>
-          </div>
-          <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium overflow-hidden">
-            <Mail size={12} className="text-slate-400 shrink-0" />
-            <span className="truncate">{res.contact_data.email}</span>
           </div>
         </div>
 
@@ -94,20 +81,19 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
            <div className="bg-slate-50 p-2 rounded-md border border-slate-100">
             <div className="flex justify-between items-center mb-1">
               <span className="text-[9px] font-black text-slate-400 uppercase">Tipo richiesta</span>
-              <span className="text-[9px] font-black text-blue-500 uppercase">{structure?.slug === 'finanza-agevolata' ? 'Finanza' : 'Servizi Dig.'}</span>
             </div>
-            <span className="text-[11px] font-black text-slate-700 leading-tight block">{res.request_type}</span>
+            <span className="text-[11px] font-black text-blue-600 leading-tight block uppercase">{res.request_type}</span>
           </div>
         </div>
 
         <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-300 uppercase tracking-tighter">
+          <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-200 uppercase tracking-tighter">
             <Calendar size={10} />
             {new Date(deal.created_at).toLocaleDateString('it-IT')}
           </div>
           <div className="flex items-center -space-x-2">
             <Avatar className="h-6 w-6 rounded-md border-2 border-white">
-              <AvatarFallback className="bg-blue-100 text-blue-600 text-[10px] font-black">A</AvatarFallback>
+              <AvatarFallback className="bg-blue-50 text-blue-600 text-[10px] font-black">A</AvatarFallback>
             </Avatar>
           </div>
         </div>
@@ -131,9 +117,9 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
           <h4 className="text-[13px] font-black text-slate-800 leading-tight flex-1 uppercase tracking-tight">{deal.title}</h4>
           <span className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{structure?.name}</span>
         </div>
-        {deal.form_result && (
+        {deal.preanalysis_result && (
           <Badge className="bg-blue-50 text-blue-600 text-[10px] font-black uppercase px-1.5 py-0 border-none shadow-none">
-            {deal.form_result.score}%
+            {deal.preanalysis_result.score}%
           </Badge>
         )}
       </div>

@@ -27,7 +27,7 @@ export interface CRMDeal {
   email: string;
   value: number;
   assigned_to: string;
-  form_result: PreanalysisResult | null;
+  preanalysis_result: PreanalysisResult | null;
   custom_fields: Record<string, any>;
   form_source?: string;
   created_at: string;

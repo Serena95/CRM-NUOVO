@@ -34,7 +34,7 @@ const iconMap: Record<string, any> = {
   'prenotazione-online': Smartphone,
 };
 
-export const CRMStructuresSelector: React.FC = () => {
+export const CRMStructuresSelector: React.FC<{ onSelect?: () => void }> = ({ onSelect }) => {
   const { structures, activeStructure, switchStructure } = useCRMStore();
 
   const Icon = activeStructure ? iconMap[activeStructure.slug] || LayoutGrid : LayoutGrid;
@@ -43,13 +43,9 @@ export const CRMStructuresSelector: React.FC = () => {
     <div className="flex items-center gap-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-3 px-4 py-2 bg-white rounded-lg border border-slate-200 shadow-sm hover:border-blue-300 transition-all group outline-none h-10">
-            <div className="text-left">
-              <h3 className="text-[12px] font-black text-slate-700 tracking-tight flex items-center gap-2 uppercase">
-                <span className="text-slate-400 font-medium normal-case">Pipeline:</span> {activeStructure?.name || 'Seleziona...'}
-                <ChevronDown size={14} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
-              </h3>
-            </div>
+          <button className="flex items-center gap-2 text-[14px] font-black text-blue-600 hover:text-blue-700 transition-colors uppercase tracking-tight outline-none h-10 group">
+            <span>Pipeline</span>
+            <ChevronDown size={16} className="text-blue-400 group-hover:translate-y-0.5 transition-transform" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[300px] p-2 rounded-xl shadow-2xl border-slate-100 z-[100]">
@@ -64,7 +60,10 @@ export const CRMStructuresSelector: React.FC = () => {
               return (
                 <DropdownMenuItem 
                   key={s.id}
-                  onClick={() => switchStructure(s)}
+                  onClick={() => {
+                    switchStructure(s);
+                    if (onSelect) onSelect();
+                  }}
                   className={cn(
                     "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all",
                     isActive ? "bg-blue-50 text-blue-700" : "hover:bg-slate-50 text-slate-600"

@@ -28,10 +28,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CreateItemModal } from '@/components/crm/CreateItemModal';
 
 const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }> = ({ activeTab: propActiveTab, setActiveTab }) => {
   const { fetchInitialData, isLoading, structures, activeStructure, switchStructure, error, unsubscribeFromChanges } = useCRMStore();
   const [activeViewTab, setActiveViewTab] = useState('affari');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   useEffect(() => {
     // Force set default if no specific tab or if it's generic 'crm'
@@ -68,32 +70,23 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
 
   useLayoutEffect(() => {
     if (propActiveTab) {
-      if (propActiveTab.startsWith('nexus-') || propActiveTab === 'finanza-agevolata' || propActiveTab === 'servizi-digitali') {
-        const slug = propActiveTab.startsWith('nexus-') ? propActiveTab.replace('nexus-', '') : propActiveTab;
-        const struct = structures.find(s => s.slug === slug || s.slug === slug.replace('-', ' '));
-        if (struct) {
-          switchStructure(struct);
-          setActiveViewTab('affari');
-        }
-      } else {
-        const tabMap: Record<string, string> = {
-          'affari': 'affari',
-          'deals': 'affari',
-          'crm': 'affari',
-          'leads': 'leads',
-          'contacts': 'contatti',
-          'companies': 'aziende',
-          'analytics': 'analytics',
-          'activities': 'analytics',
-          'preventivi': 'affari'
-        };
-        const targetTab = tabMap[propActiveTab];
-        if (targetTab && activeViewTab !== targetTab) {
-          setActiveViewTab(targetTab);
-        }
+      const tabMap: Record<string, string> = {
+        'affari': 'affari',
+        'deals': 'affari',
+        'crm': 'affari',
+        'leads': 'leads',
+        'contacts': 'contatti',
+        'companies': 'aziende',
+        'analytics': 'analytics',
+        'activities': 'analytics',
+        'preventivi': 'affari'
+      };
+      const targetTab = tabMap[propActiveTab];
+      if (targetTab && activeViewTab !== targetTab) {
+        setActiveViewTab(targetTab);
       }
     }
-  }, [propActiveTab, structures]);
+  }, [propActiveTab]);
 
   const tabs = [
     { id: 'leads', label: 'Lead', icon: Users2 },
@@ -110,11 +103,18 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
       {/* Bitrix Style Header */}
       <div className="bg-white border-b border-slate-200 shrink-0 shadow-sm z-30">
         <div className="px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-[14px] font-medium text-slate-400 capitalize">CRM / </span>
-            <span className="text-[14px] font-black text-slate-800 uppercase tracking-tight">
-              {tabs.find(t => t.id === activeViewTab)?.label || 'Affari'}
-            </span>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <span className="text-[14px] font-medium text-slate-400 capitalize">CRM / </span>
+              <span className="text-[14px] font-black text-slate-800 uppercase tracking-tight">Affari</span>
+            </div>
+            
+            <div className="h-6 w-[1px] bg-slate-200" />
+            
+            <CRMStructuresSelector onSelect={() => {
+              setActiveViewTab('affari');
+              setActiveTab('affari');
+            }} />
           </div>
 
           <div className="flex items-center gap-3">
@@ -148,15 +148,15 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
                     };
                     try {
                       await supabaseCRMService.processFormSubmission(payload, 'https://forms.gle/RBigx9gHGJ5pEJeS6');
-                      await fetchInitialData();
-                      toast.success("Lead inviato alla Pipeline Finanza!");
+                      await fetchInitialData('finanza-agevolata');
+                      toast.success("Affare creato in Finanza Agevolata!");
                     } catch (e) { toast.error("Errore simulazione"); }
                   }}
                   className="p-3 cursor-pointer rounded-lg hover:bg-blue-50 transition-colors"
                 >
                   <div className="flex flex-col">
-                    <span className="text-[11px] font-black text-slate-700 uppercase">Bando Finanza Agevolata</span>
-                    <span className="text-[9px] text-slate-400">forms.gle/RBigx9gHGJ5p...</span>
+                    <span className="text-[11px] font-black text-slate-700 uppercase">Bando Finanza Agevolata (SINCRO)</span>
+                    <span className="text-[9px] text-slate-400 font-mono">forms.gle/RBigx9gHGJ5pEJeS6</span>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuItem 
@@ -174,21 +174,24 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
                     };
                     try {
                       await supabaseCRMService.processFormSubmission(payload, 'https://forms.gle/kUaGCoJcW7uYZU44A');
-                      await fetchInitialData();
-                      toast.success("Lead inviato alla Pipeline Digital!");
+                      await fetchInitialData('servizi-digitali');
+                      toast.success("Affare creato in Servizi Digitali!");
                     } catch (e) { toast.error("Errore simulazione"); }
                   }}
                   className="p-3 cursor-pointer rounded-lg hover:bg-orange-50 transition-colors"
                 >
                   <div className="flex flex-col">
-                    <span className="text-[11px] font-black text-slate-700 uppercase">Servizi Digitali</span>
-                    <span className="text-[9px] text-slate-400">forms.gle/kUaGCoJcW7uY...</span>
+                    <span className="text-[11px] font-black text-slate-700 uppercase">Servizi Digitali (SINCRO)</span>
+                    <span className="text-[9px] text-slate-400 font-mono">forms.gle/kUaGCoJcW7uYZU44A</span>
                   </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             
-            <Button className="bg-[#2FC6F6] hover:bg-[#1eb0e0] text-white font-black rounded-full px-6 h-10 text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100">
+            <Button 
+              onClick={() => setIsCreateModalOpen(true)}
+              className="bg-[#2FC6F6] hover:bg-[#1eb0e0] text-white font-black rounded-full px-6 h-10 text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100"
+            >
               <Plus size={16} className="mr-2" /> 
               NUOVO AFFARE
             </Button>
@@ -230,8 +233,6 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
         {/* Interaction Bar (Bitrix Style) */}
         <div className="px-6 py-3 bg-[#eef2f7] border-b border-slate-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
-            <CRMStructuresSelector />
-            
             <Button 
               variant="ghost" 
               size="sm" 
@@ -316,6 +317,12 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
           )}
         </div>
       </div>
+      <CreateItemModal 
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        type="deal"
+        pipelineId={activeStructure?.id}
+      />
     </div>
   );
 };

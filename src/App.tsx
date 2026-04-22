@@ -101,15 +101,6 @@ const App: React.FC = () => {
       case 'invoices':
       case 'crm':
       case 'preventivi':
-      case 'finanza-agevolata':
-      case 'servizi-digitali':
-      case 'consulenze':
-      case 'economie':
-      case 'organizzazione-eventi':
-      case 'prodotti-e-servizi':
-      case 'formazione':
-      case 'coworking':
-      case 'prenotazione-online':
       case 'ai-agente':
         return <CRM activeTab={activeTab} setActiveTab={setActiveTab} />;
       case 'tasks':
@@ -174,17 +165,6 @@ const App: React.FC = () => {
       case 'apps-marketplace':
       case 'apps-integrations':
         return <Applications />;
-      case 'nexus-general':
-      case 'nexus-finanza':
-      case 'nexus-digitale':
-      case 'nexus-consulenze':
-      case 'nexus-eventi':
-      case 'nexus-prodotti':
-      case 'nexus-formazione':
-      case 'nexus-coworking':
-      case 'nexus-prenotazioni':
-      case 'nexus-economie':
-        return <CRM activeTab={activeTab} setActiveTab={setActiveTab} />;
       case 'settings':
       case 'settings-users':
       case 'settings-roles':

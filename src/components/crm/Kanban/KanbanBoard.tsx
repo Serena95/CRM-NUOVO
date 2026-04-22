@@ -18,11 +18,15 @@ import { Loader2, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DetailDrawer } from '../DetailDrawer';
 import { Button } from '@/components/ui/button';
 
+import { CreateItemModal } from '../CreateItemModal';
+
 export const KanbanBoard: React.FC = () => {
   const { stages, deals, activeStructure, moveDeal, isLoading } = useCRMStore();
   const [activeDeal, setActiveDeal] = useState<CRMDeal | null>(null);
   const [selectedDeal, setSelectedDeal] = useState<CRMDeal | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedStageId, setSelectedStageId] = useState<string | undefined>(undefined);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
@@ -152,6 +156,10 @@ export const KanbanBoard: React.FC = () => {
                   setSelectedDeal(deal);
                   setIsDrawerOpen(true);
                 }}
+                onAddDeal={() => {
+                  setSelectedStageId(stage.id);
+                  setIsCreateModalOpen(true);
+                }}
               />
             ))}
           </div>
@@ -171,6 +179,14 @@ export const KanbanBoard: React.FC = () => {
         onClose={() => setIsDrawerOpen(false)}
         item={selectedDeal}
         type="deal"
+      />
+
+      <CreateItemModal 
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        type="deal"
+        pipelineId={activeStructure?.id}
+        stageId={selectedStageId}
       />
     </div>
   );

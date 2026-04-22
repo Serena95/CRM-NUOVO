@@ -9,9 +9,10 @@ interface KanbanColumnProps {
   stage: CRMStage;
   deals: CRMDeal[];
   onCardClick?: (deal: CRMDeal) => void;
+  onAddDeal?: () => void;
 }
 
-export const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, deals, onCardClick }) => {
+export const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, deals, onCardClick, onAddDeal }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id,
   });
@@ -45,7 +46,10 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, deals, onCard
             €{totalValue.toLocaleString()}
           </span>
           {!stage.name.toLowerCase().includes('preanalisi') && (
-            <button className="w-6 h-6 rounded-md bg-blue-50 text-blue-500 flex items-center justify-center hover:bg-blue-100 transition-colors">
+            <button 
+              onClick={onAddDeal}
+              className="w-6 h-6 rounded-md bg-blue-50 text-blue-500 flex items-center justify-center hover:bg-blue-100 transition-colors"
+            >
               <Plus size={14} />
             </button>
           )}

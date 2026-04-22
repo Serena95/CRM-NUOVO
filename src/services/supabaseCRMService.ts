@@ -6,47 +6,74 @@ export const supabaseCRMService = {
   // Initialize CRM structures and stages if they don't exist
   async initializeCRM() {
     try {
-      // 1. Check if we already have structures
-      const { count } = await supabase
+      // 1. Get existing structures
+      const { data: existingStructs, error: fetchStructError } = await supabase
         .from('crm_structures')
-        .select('*', { count: 'exact', head: true });
+        .select('slug');
       
-      if (count && count > 0) return; // Already initialized
+      if (fetchStructError) throw fetchStructError;
+      
+      const existingSlugs = new Set(existingStructs?.map(s => s.slug) || []);
+      const newStructuresToInsert = CRM_STRUCTURES.filter(s => !existingSlugs.has(s.slug));
 
-      // 2. Bulk Insert Structures
-      const { data: insertedStructures, error: structError } = await supabase
+      // 2. Insert missing structures
+      if (newStructuresToInsert.length > 0) {
+        const { error: structError } = await supabase
+          .from('crm_structures')
+          .insert(newStructuresToInsert.map(s => ({
+            name: s.name,
+            slug: s.slug,
+            color: s.color
+          })));
+        if (structError) throw structError;
+      }
+
+      // 3. Re-fetch ALL structures
+      const { data: allStructs, error: allFetchError } = await supabase
         .from('crm_structures')
-        .insert(CRM_STRUCTURES.map(s => ({
-          name: s.name,
-          slug: s.slug,
-          color: s.color
-        })))
-        .select();
+        .select('*');
+      
+      if (allFetchError) throw allFetchError;
 
-      if (structError) throw structError;
-
-      // 3. Bulk Insert Stages for each new structure
-      if (insertedStructures) {
-        const allStages = insertedStructures.flatMap(struct => 
-          CRM_PIPELINE_STAGES.map(stage => ({
-            structure_id: struct.id,
-            name: stage.name,
-            position: stage.position,
-            is_won: stage.is_won,
-            is_lost: stage.is_lost,
-            color: stage.color
-          }))
-        );
-
-        const { error: stageError } = await supabase
+      // 4. For each structure, sync required stages
+      for (const struct of allStructs) {
+        const { data: currentStages, error: fetchStagesError } = await supabase
           .from('crm_stages')
-          .insert(allStages);
+          .select('*')
+          .eq('structure_id', struct.id);
+        
+        if (fetchStagesError) throw fetchStagesError;
+        
+        const stageMap = new Map(currentStages?.map(s => [s.name, s]) || []);
 
-        if (stageError) throw stageError;
+        for (const stageDef of CRM_PIPELINE_STAGES) {
+          const existing = stageMap.get(stageDef.name);
+          if (existing) {
+            // Update position/attributes if changed
+            if (existing.position !== stageDef.position || existing.color !== stageDef.color) {
+              await supabase.from('crm_stages').update({
+                position: stageDef.position,
+                color: stageDef.color,
+                is_won: stageDef.is_won,
+                is_lost: stageDef.is_lost
+              }).eq('id', existing.id);
+            }
+          } else {
+            // Insert missing stage
+            await supabase.from('crm_stages').insert({
+              structure_id: struct.id,
+              name: stageDef.name,
+              position: stageDef.position,
+              is_won: stageDef.is_won,
+              is_lost: stageDef.is_lost,
+              color: stageDef.color
+            });
+          }
+        }
       }
     } catch (error) {
-      console.error("Initialization failed, but app will fallback to local constants:", error);
-      throw error; // Let the store handle the error
+      console.error("CRM Sync failed:", error);
+      throw error;
     }
   },
 
@@ -103,27 +130,45 @@ export const supabaseCRMService = {
     return data as CRMDeal;
   },
 
+  async createDeal(dealData: Partial<CRMDeal>) {
+    const { data, error } = await supabase
+      .from('crm_deals')
+      .insert({
+        ...dealData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as CRMDeal;
+  },
+
   async triggerAutomations(deal: CRMDeal, stageName: string) {
     const automations: Record<string, () => Promise<any>> = {
       'Verifica telefonica': async () => 
-        this.addActivity(deal.id, 'task', '📞 Chiamata di verifica', `Contattare ${deal.contact} per verifica requisiti iniziali.`),
+        this.addActivity(deal.id, 'task', '📞 Task: Chiamata', `Effettuare chiamata di verifica per ${deal.contact} (${deal.company}).`),
       
       'Invio preventivo': async () => 
-        this.addActivity(deal.id, 'task', '📋 Follow-up preventivo', `Verificare ricezione e feedback del preventivo inviato a ${deal.company}.`),
+        this.addActivity(deal.id, 'task', '📋 Task: Follow-up', `Eseguire follow-up per il preventivo inviato a ${deal.company}.`),
       
       'Contratto': async () => 
-        this.addActivity(deal.id, 'task', '✍️ Firma contratto', `Sollecitare la firma del contratto relativo alla pratica "${deal.title}".`),
+        this.addActivity(deal.id, 'task', '✍️ Task: Firma', `Verificare e sollecitare la firma del contratto per ${deal.title}.`),
       
       'Pagamento': async () => {
         console.log(`[NOTIFICA ADMIN] Pagamento per deal ${deal.title}`);
-        return this.addActivity(deal.id, 'system', '💰 Notifica Pagamento', 'Deal passato in fase pagamento. Notifica inviata all\'amministrazione.');
+        return this.addActivity(deal.id, 'system', '💰 Notifica Admin', 'Affare in fase pagamento. Notifica inviata all\'amministrazione per incasso.');
       },
       
-      'Affare vinto': async () => 
-        this.addActivity(deal.id, 'system', '🏆 Affare Vinto', 'Deal concluso con successo!'),
+      'Affare vinto': async () => {
+        await this.addActivity(deal.id, 'system', '🏆 Affare Vinto', 'Il deal è stato chiuso positivamente.');
+        // Qui potremmo aggiungere logica per "chiudere" l'affare se avessimo un campo status
+      },
       
-      'Affare perso': async () => 
-        this.addActivity(deal.id, 'system', '❌ Affare Perso', 'Deal chiuso negativamente.')
+      'Affare perso': async () => {
+        await this.addActivity(deal.id, 'system', '❌ Affare Perso', 'Il deal è stato chiuso negativamente.');
+      }
     };
 
     if (automations[stageName]) {
@@ -229,7 +274,7 @@ export const supabaseCRMService = {
         email: payload.email,
         value: payload.expectedValue || 0,
         assigned_to: 'Support Team', // Default commerciale
-        form_result: preanalysis,
+        preanalysis_result: preanalysis,
         form_source: formUrl,
         custom_fields: payload
       })
