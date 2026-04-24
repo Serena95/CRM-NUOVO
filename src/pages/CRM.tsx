@@ -3,6 +3,8 @@ import { useCRMStore } from '@/stores/crmStore';
 import { supabaseCRMService } from '@/services/supabaseCRMService';
 import { CRMStructuresSelector } from '@/components/crm/CRMStructuresSelector';
 import { KanbanBoard } from '@/components/crm/Kanban/KanbanBoard';
+import { DealList } from '@/components/crm/DealList';
+import { DealCalendar } from '@/components/crm/DealCalendar';
 import { toast } from 'sonner';
 import { 
   BarChart3, 
@@ -16,7 +18,11 @@ import {
   Zap,
   Download,
   MoreHorizontal,
-  Activity
+  Activity,
+  X,
+  LayoutGrid,
+  List,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,11 +35,43 @@ import {
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CreateItemModal } from '@/components/crm/CreateItemModal';
+import { AdvancedFilters } from '@/components/crm/AdvancedFilters';
+import { DetailDrawer } from '@/components/crm/DetailDrawer';
 
 const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }> = ({ activeTab: propActiveTab, setActiveTab }) => {
-  const { fetchInitialData, isLoading, structures, activeStructure, switchStructure, error, unsubscribeFromChanges } = useCRMStore();
+  const { 
+    fetchInitialData, 
+    isLoading, 
+    structures, 
+    activeStructure, 
+    switchStructure, 
+    error, 
+    unsubscribeFromChanges,
+    filters,
+    setFilters,
+    crmView,
+    setCRMView
+  } = useCRMStore();
+
   const [activeViewTab, setActiveViewTab] = useState('affari');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedDeal, setSelectedDeal] = useState<any>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpenDeal = (event: any) => {
+      const { dealId } = event.detail;
+      const deals = useCRMStore.getState().getFilteredDeals();
+      const deal = deals.find((d: any) => d.id === dealId);
+      if (deal) {
+        setSelectedDeal(deal);
+        setIsDrawerOpen(true);
+      }
+    };
+
+    window.addEventListener('crm:openDeal', handleOpenDeal);
+    return () => window.removeEventListener('crm:openDeal', handleOpenDeal);
+  }, []);
 
   useEffect(() => {
     // Force set default if no specific tab or if it's generic 'crm'
@@ -100,16 +138,16 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
 
   return (
     <div className="h-full flex flex-col bg-[#f5f7fb] overflow-hidden relative">
-      {/* Bitrix Style Header */}
-      <div className="bg-white border-b border-slate-200 shrink-0 shadow-sm z-30">
-        <div className="px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
+      {/* Bitrix Style Header - Sticky */}
+      <div className="bg-white border-b border-slate-200 shrink-0 shadow-sm z-30 sticky top-0 md:relative">
+        <div className="px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 md:gap-6">
+            <div className="hidden md:flex items-center gap-2">
               <span className="text-[14px] font-medium text-slate-400 capitalize">CRM / </span>
               <span className="text-[14px] font-black text-slate-800 uppercase tracking-tight">Affari</span>
             </div>
             
-            <div className="h-6 w-[1px] bg-slate-200" />
+            <div className="hidden md:block h-6 w-[1px] bg-slate-200" />
             
             <CRMStructuresSelector onSelect={() => {
               setActiveViewTab('affari');
@@ -117,7 +155,7 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
             }} />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
@@ -190,7 +228,7 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
             
             <Button 
               onClick={() => setIsCreateModalOpen(true)}
-              className="bg-[#2FC6F6] hover:bg-[#1eb0e0] text-white font-black rounded-full px-6 h-10 text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100"
+              className="bg-[#2FC6F6] hover:bg-[#1eb0e0] text-white font-black rounded-full px-4 md:px-6 h-10 text-[10px] uppercase tracking-widest shadow-lg shadow-blue-100 hidden md:flex"
             >
               <Plus size={16} className="mr-2" /> 
               NUOVO AFFARE
@@ -198,8 +236,8 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
           </div>
         </div>
 
-        {/* Sub-navigation bar (Tabs style like Bitrix top bar) */}
-        <div className="px-6 flex items-center gap-8 border-t border-slate-50">
+        {/* Sub-navigation bar - Horizontal scroll on mobile */}
+        <div className="px-4 md:px-6 flex items-center gap-6 md:gap-8 border-t border-slate-50 overflow-x-auto no-scrollbar">
            {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -229,45 +267,107 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
       </div>
 
       {/* Main CRM Workspace */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Interaction Bar (Bitrix Style) */}
-        <div className="px-6 py-3 bg-[#eef2f7] border-b border-slate-200 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Interaction Bar (Bitrix Style) - Sticky on mobile */}
+        <div className="px-4 md:px-6 py-2.5 md:py-3 bg-[#eef2f7] border-b border-slate-200 flex items-center justify-between shrink-0 sticky top-[57px] md:relative z-20">
+          <div className="flex items-center gap-3 md:gap-4 overflow-x-auto no-scrollbar flex-1 mr-2">
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={() => fetchInitialData(activeStructure?.slug, true)}
-              className="h-9 text-[10px] font-black text-blue-600 uppercase tracking-widest bg-white shadow-sm border border-slate-200 px-4 rounded-md hover:bg-blue-50 transition-colors"
+              className="h-8 md:h-9 text-[9px] md:text-[10px] font-black text-blue-600 uppercase tracking-widest bg-white shadow-sm border border-slate-200 px-3 md:px-4 rounded-md hover:bg-blue-50 transition-colors shrink-0"
               title="Aggiorna dati"
             >
-              <Activity size={14} className="mr-2" /> AGGIORNA
+              <Activity size={14} className="mr-1.5 md:mr-2" /> AGGIORNA
             </Button>
 
-            <Button variant="ghost" size="sm" className="h-9 text-[10px] font-black text-slate-500 uppercase tracking-widest bg-white shadow-sm border border-slate-200 px-4 rounded-md hover:bg-slate-50 transition-colors">
-              <Filter size={14} className="mr-2 text-blue-500" /> FILTRI
-            </Button>
+            <AdvancedFilters />
 
-            <div className="relative group w-64">
+            <div className="relative group w-40 md:w-64 shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
               <Input 
                 placeholder="Cerca in questa pipeline..." 
-                className="pl-9 bg-white border-slate-200 h-9 rounded-md text-xs focus-visible:ring-1 focus-visible:ring-blue-400"
+                value={filters.search}
+                onChange={(e) => setFilters({ search: e.target.value })}
+                className="pl-9 bg-white border-slate-200 h-8 md:h-9 rounded-md text-xs focus-visible:ring-1 focus-visible:ring-blue-400"
               />
+              {filters.search && (
+                <button 
+                  onClick={() => setFilters({ search: '' })}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={12} />
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-             <div className="flex bg-slate-200/50 p-1 rounded-lg">
-               <button className="px-4 py-1.5 bg-white shadow-sm rounded-md text-[10px] font-black text-blue-600 uppercase tracking-widest transition-all">Kanban</button>
-               <button className="px-4 py-1.5 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-slate-700 transition-all">Elenco</button>
-             </div>
-             
-             <div className="h-6 w-[1px] bg-slate-300 mx-2" />
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Desktop View Switcher */}
+            <div className="hidden lg:flex bg-slate-200/50 p-1 rounded-lg">
+              <button 
+                onClick={() => setCRMView('kanban')}
+                className={cn(
+                  "px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
+                  crmView === 'kanban' ? "bg-white shadow-sm text-blue-600" : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Kanban
+              </button>
+              <button 
+                onClick={() => setCRMView('list')}
+                className={cn(
+                  "px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
+                  crmView === 'list' ? "bg-white shadow-sm text-blue-600" : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Elenco
+              </button>
+              <button 
+                onClick={() => setCRMView('calendar')}
+                className={cn(
+                  "px-4 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all",
+                  crmView === 'calendar' ? "bg-white shadow-sm text-blue-600" : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Calendario
+              </button>
+            </div>
 
-             <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 bg-white border border-slate-200 shadow-sm">
+            {/* Mobile/Tablet View Switcher - Icons only */}
+            <div className="flex lg:hidden bg-white border border-slate-200 p-1 rounded-lg shadow-sm">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={cn("h-8 w-8 rounded-md", crmView === 'kanban' ? "bg-blue-50 text-blue-600" : "text-slate-400")}
+                onClick={() => setCRMView('kanban')}
+              >
+                <LayoutGrid size={16} />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={cn("h-8 w-8 rounded-md", crmView === 'list' ? "bg-blue-50 text-blue-600" : "text-slate-400")}
+                onClick={() => setCRMView('list')}
+              >
+                <List size={16} />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={cn("h-8 w-8 rounded-md", crmView === 'calendar' ? "bg-blue-50 text-blue-600" : "text-slate-400")}
+                onClick={() => setCRMView('calendar')}
+              >
+                <CalendarIcon size={16} />
+              </Button>
+            </div>
+             
+            <div className="hidden sm:block h-6 w-[1px] bg-slate-300 mx-2" />
+
+             <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9 text-slate-500 bg-white border border-slate-200 shadow-sm">
               <Download size={15} />
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 bg-white border border-slate-200 shadow-sm">
+            <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9 text-slate-500 bg-white border border-slate-200 shadow-sm">
               <MoreHorizontal size={15} />
             </Button>
           </div>
@@ -292,7 +392,41 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
           </AnimatePresence>
 
           {activeViewTab === 'affari' ? (
-            <KanbanBoard key="kanban" />
+            <AnimatePresence mode="wait">
+              {crmView === 'kanban' && (
+                <motion.div
+                  key="kanban"
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 1.02 }}
+                  className="h-full"
+                >
+                  <KanbanBoard />
+                </motion.div>
+              )}
+              {crmView === 'list' && (
+                <motion.div
+                  key="list"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="h-full flex flex-col"
+                >
+                  <DealList />
+                </motion.div>
+              )}
+              {crmView === 'calendar' && (
+                <motion.div
+                  key="calendar"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="h-full flex flex-col"
+                >
+                  <DealCalendar />
+                </motion.div>
+              )}
+            </AnimatePresence>
           ) : (
             <motion.div 
               key="fallback"
@@ -315,6 +449,14 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
               </Button>
             </motion.div>
           )}
+
+          {/* Floating Action Button for Mobile */}
+          <button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-[#2FC6F6] text-white rounded-full shadow-2xl flex items-center justify-center z-50 active:scale-95 transition-transform"
+          >
+            <Plus size={28} />
+          </button>
         </div>
       </div>
       <CreateItemModal 
@@ -322,6 +464,13 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
         onClose={() => setIsCreateModalOpen(false)}
         type="deal"
         pipelineId={activeStructure?.id}
+      />
+      
+      <DetailDrawer 
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        item={selectedDeal}
+        type={activeViewTab === 'leads' ? 'lead' : 'deal'}
       />
     </div>
   );

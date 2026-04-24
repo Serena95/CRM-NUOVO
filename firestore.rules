@@ -82,7 +82,30 @@ service cloud.firestore {
       allow delete: if (isOwner(existing().userId) || isAdmin());
     }
 
-    // --- Notifications ---
+    // --- CRM Notifications ---
+    function isValidCRMNotification(data) {
+      return data.keys().hasAll(['userId', 'type', 'title', 'description', 'dealId', 'dealTitle', 'read', 'createdAt', 'createdBy']) &&
+             (data.userId == request.auth.uid || data.userId == 'all') &&
+             data.type is string &&
+             data.title is string && data.title.size() <= 200 &&
+             data.description is string && data.description.size() <= 1000 &&
+             data.dealId is string &&
+             data.read is bool;
+    }
+
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userId == 'all');
+      allow update: if isOwner(resource.data.userId) && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow create: if isSignedIn(); // Allow any signed in user to trigger notifications
+    }
+
+    // --- Public Leads ---
+    match /leads/{leadId} {
+      allow create: if true; // Allows public form submission from landing page
+      allow read, update, delete: if isAdmin();
+    }
+
+    // --- Social Notifications ---
     match /social_notifications/{notifId} {
       allow read: if isOwner(resource.data.recipientId);
       allow update: if isOwner(resource.data.recipientId) && incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);

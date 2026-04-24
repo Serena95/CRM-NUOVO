@@ -16,6 +16,15 @@ export interface CRMStage {
   color?: string;
 }
 
+export interface CRMUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'commerciale' | 'consulente' | 'admin' | 'support';
+  avatar?: string;
+  team?: string;
+}
+
 export interface CRMDeal {
   id: string;
   structure_id: string;
@@ -26,11 +35,14 @@ export interface CRMDeal {
   phone: string;
   email: string;
   value: number;
-  assigned_to: string;
+  assigned_to: string; // Responsible User ID or Name
+  assistants?: string[]; // Array of User IDs
+  team?: string;
   preanalysis_result: PreanalysisResult | null;
   custom_fields: Record<string, any>;
   form_source?: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface PreanalysisResult {

@@ -1,8 +1,40 @@
 import { supabase } from '@/lib/supabase';
 import { CRMStructure, CRMStage, CRMDeal, CRMFormResult, PreanalysisResult } from '@/types/crm';
 import { CRM_STRUCTURES, CRM_PIPELINE_STAGES } from '@/constants/crm';
+import { notificationService } from './notificationService';
+import { auth } from '@/lib/firebase';
+import { NotificationType } from '@/types/notifications';
 
 export const supabaseCRMService = {
+  // Helper to send notifications
+  async sendCRMNotification(params: {
+    type: NotificationType;
+    title: string;
+    description: string;
+    dealId: string;
+    dealTitle: string;
+    structureId?: string;
+    structureSlug?: string;
+    userId: string;
+  }) {
+    const currentUser = auth.currentUser;
+    await notificationService.createNotification({
+      type: params.type,
+      title: params.title,
+      description: params.description,
+      dealId: params.dealId,
+      dealTitle: params.dealTitle,
+      structureId: params.structureId,
+      structureSlug: params.structureSlug,
+      userId: params.userId,
+      createdBy: {
+        id: currentUser?.uid || 'system',
+        name: currentUser?.displayName || 'System Automation',
+        avatar: currentUser?.photoURL || undefined
+      }
+    });
+  },
+
   // Initialize CRM structures and stages if they don't exist
   async initializeCRM() {
     try {
@@ -122,9 +154,27 @@ export const supabaseCRMService = {
     
     if (error) throw error;
 
-    // Trigger automations based on stage transition
+    // Trigger notifications for stage change
     if (stage) {
-      await this.triggerAutomations(data as CRMDeal, stage.name);
+      const deal = data as CRMDeal;
+      const isWon = stage.name.toLowerCase().includes('vinto');
+      const isLost = stage.name.toLowerCase().includes('perso');
+      
+      let type: NotificationType = 'stage_change';
+      if (isWon) type = 'deal_won';
+      if (isLost) type = 'deal_lost';
+
+      await this.sendCRMNotification({
+        type,
+        title: isWon ? '🏆 Affare Vinto!' : (isLost ? '❌ Affare Perso' : '🔄 Cambio Stage'),
+        description: `L'affare "${deal.title}" è passato allo stage: ${stage.name}`,
+        dealId: deal.id,
+        dealTitle: deal.title,
+        structureId: deal.structure_id,
+        userId: deal.assigned_to === 'user-1' || deal.assigned_to === 'user-2' || deal.assigned_to === 'user-3' ? deal.assigned_to : 'all'
+      });
+
+      await this.triggerAutomations(deal, stage.name);
     }
 
     return data as CRMDeal;
@@ -145,7 +195,61 @@ export const supabaseCRMService = {
     return data as CRMDeal;
   },
 
+  async updateDeal(dealId: string, updates: Partial<CRMDeal>) {
+    const { data, error } = await supabase
+      .from('crm_deals')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', dealId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as CRMDeal;
+  },
+
   async triggerAutomations(deal: CRMDeal, stageName: string) {
+    const autoUpdates: Partial<CRMDeal> = {};
+    let shouldUpdateDeal = false;
+
+    // Assignment Logic
+    if (stageName === 'Form preanalisi' && (!deal.assigned_to || deal.assigned_to === 'Support Team')) {
+      autoUpdates.assigned_to = 'user-1'; // Marco Rossini (Commerciale)
+      autoUpdates.team = 'Sales Team';
+      shouldUpdateDeal = true;
+      await this.addActivity(deal.id, 'system', '🤖 Assegnazione Automatica', 'Affare assegnato a Marco Rossini (Commerciale) per primo contatto.');
+      
+      await this.sendCRMNotification({
+        type: 'assignment',
+        title: '👤 Nuovo Affare Assegnato',
+        description: `Ti è stato assegnato un nuovo affare: ${deal.title}`,
+        dealId: deal.id,
+        dealTitle: deal.title,
+        structureId: deal.structure_id,
+        userId: 'user-1'
+      });
+    }
+
+    if (stageName === 'Verifica requisiti') {
+      autoUpdates.assigned_to = 'user-3'; // Giuseppe Verdi (Consulente)
+      autoUpdates.team = 'Consulting';
+      shouldUpdateDeal = true;
+      await this.addActivity(deal.id, 'system', '🤖 Assegnazione Consulente', 'Affare passato a Giuseppe Verdi per verifica tecnica requisiti.');
+      
+      await this.sendCRMNotification({
+        type: 'assignment',
+        title: '👤 Nuova Verifica Tecnica',
+        description: `Affare "${deal.title}" assegnato per verifica requisiti.`,
+        dealId: deal.id,
+        dealTitle: deal.title,
+        structureId: deal.structure_id,
+        userId: 'user-3'
+      });
+    }
+
+    if (shouldUpdateDeal) {
+      await this.updateDeal(deal.id, autoUpdates);
+    }
+
     const automations: Record<string, () => Promise<any>> = {
       'Verifica telefonica': async () => 
         this.addActivity(deal.id, 'task', '📞 Task: Chiamata', `Effettuare chiamata di verifica per ${deal.contact} (${deal.company}).`),
@@ -177,6 +281,8 @@ export const supabaseCRMService = {
   },
 
   async addActivity(dealId: string, type: 'task' | 'call' | 'note' | 'system', title: string, description: string) {
+    const { data: deal } = await supabase.from('crm_deals').select('title, assigned_to, structure_id').eq('id', dealId).single();
+    
     const { error } = await supabase
       .from('crm_activities')
       .insert({
@@ -186,7 +292,20 @@ export const supabaseCRMService = {
         description
       });
     
-    if (error) console.error('Error adding activity:', error);
+    if (error) {
+      console.error('Error adding activity:', error);
+    } else if (deal) {
+      // Notify about new activity
+      await this.sendCRMNotification({
+        type: type === 'task' ? 'task_created' : 'new_comment',
+        title: type === 'task' ? '📅 Nuovo Task Creato' : '💬 Nuovo Commento',
+        description: `${title}: ${description.substring(0, 50)}${description.length > 50 ? '...' : ''}`,
+        dealId,
+        dealTitle: deal.title,
+        structureId: deal.structure_id,
+        userId: deal.assigned_to.startsWith('user-') ? deal.assigned_to : 'all'
+      });
+    }
   },
 
   async getDealActivities(dealId: string) {
@@ -198,6 +317,57 @@ export const supabaseCRMService = {
 
     if (error) throw error;
     return data;
+  },
+
+  async getStructureActivities(structureId: string) {
+    // We join with deals to make sure we only get activities for the current pipeline
+    const { data, error } = await supabase
+      .from('crm_activities')
+      .select(`
+        *,
+        crm_deals!inner (
+          id,
+          title,
+          company,
+          structure_id
+        )
+      `)
+      .eq('crm_deals.structure_id', structureId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  async checkAndTriggerReminders(deal: CRMDeal, stageName: string) {
+    const inactivity = (await import('@/lib/reminderUtils')).getInactivityData(deal, stageName);
+    if (!inactivity || !inactivity.isExpired) return;
+
+    // Check if we already sent a reminder for THIS stage to avoid spam
+    const lastReminderStage = deal.custom_fields?.last_reminder_stage;
+    if (lastReminderStage === stageName) return;
+
+    try {
+      // 1. Create Task (Activity)
+      await this.addActivity(
+        deal.id, 
+        'task', 
+        `⏰ REMINDER: ${stageName}`, 
+        `Questo affare è inattivo da ${inactivity.daysInactivity} giorni nello stage "${stageName}".`
+      );
+
+      // 2. Update Deal to record that we sent the reminder
+      await this.updateDeal(deal.id, {
+        custom_fields: {
+          ...(deal.custom_fields || {}),
+          last_reminder_stage: stageName
+        }
+      });
+
+      console.log(`Reminder triggered for deal ${deal.id} in stage ${stageName}`);
+    } catch (error) {
+      console.error("Error triggering reminder:", error);
+    }
   },
 
   async processFormSubmission(payload: any, formUrl: string) {
@@ -283,6 +453,18 @@ export const supabaseCRMService = {
 
     if (dealError) throw dealError;
 
+    // Notify about new form submission
+    await this.sendCRMNotification({
+      type: 'new_form',
+      title: '📝 Nuovo Form Preanalisi',
+      description: `Nuovo lead da Google Form per ${payload.company}`,
+      dealId: deal.id,
+      dealTitle: deal.title,
+      structureId: struct.id,
+      structureSlug: struct.slug,
+      userId: 'all'
+    });
+
     // 6. AUTOMATIONS
     // A. Add Activity "Form Ricevuto"
     await this.addActivity(deal.id, 'system', '📝 Form Ricevuto', `Lead acquisito tramite form Google: ${formUrl}`);
@@ -294,5 +476,22 @@ export const supabaseCRMService = {
     console.log(`[NOTIFICA COMMERCIALE] Nuovo deal creato in ${struct.name}: ${deal.title}`);
 
     return deal;
+  },
+
+  async searchGlobalDeals(query: string) {
+    if (!query || query.length < 2) return [];
+
+    const { data, error } = await supabase
+      .from('crm_deals')
+      .select(`
+        *,
+        crm_structures (name, slug),
+        crm_stages (name)
+      `)
+      .or(`title.ilike.%${query}%,company.ilike.%${query}%,contact.ilike.%${query}%,email.ilike.%${query}%,phone.ilike.%${query}%,preanalysis_result->>notes.ilike.%${query}%`)
+      .limit(10);
+
+    if (error) throw error;
+    return data;
   }
 };

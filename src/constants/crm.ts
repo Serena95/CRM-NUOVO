@@ -38,3 +38,13 @@ export const DEFAULT_STAGES = CRM_PIPELINE_STAGES.map(s => ({
   name: s.name,
   color: s.color
 }));
+
+export const CRM_USERS = [
+  { id: 'user-1', name: 'Marco Rossini', role: 'commerciale', team: 'Sales Team', email: 'marco@nexus.it', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marco' },
+  { id: 'user-2', name: 'Laura Bianchi', role: 'commerciale', team: 'Sales Team', email: 'laura@nexus.it', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Laura' },
+  { id: 'user-3', name: 'Giuseppe Verdi', role: 'consulente', team: 'Consulting', email: 'giuseppe@nexus.it', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Giuseppe' },
+  { id: 'user-4', name: 'Elena Neri', role: 'consulente', team: 'Consulting', email: 'elena@nexus.it', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Elena' },
+  { id: 'user-5', name: 'Nexus AI Bot', role: 'admin', team: 'Nexus System', email: 'bot@nexus.it', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Zap' },
+];
+
+export const CRM_TEAMS = ['Sales Team', 'Consulting', 'Nexus System', 'Management'];

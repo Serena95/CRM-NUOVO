@@ -1,26 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useCRMStore } from '@/stores/crmStore';
 import { cn } from '@/lib/utils';
 import { 
+  X, 
   ChevronDown, 
   LayoutGrid, 
-  Check,
-  Building,
-  Globe,
-  Settings,
-  TrendingUp,
-  Calendar,
-  Package,
-  UserCog,
-  Users2,
-  Smartphone
+  Check, 
+  TrendingUp, 
+  Globe, 
+  Building, 
+  Settings, 
+  Calendar, 
+  Package, 
+  UserCog, 
+  Users2, 
+  Smartphone 
 } from 'lucide-react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const iconMap: Record<string, any> = {
   'finanza-agevolata': TrendingUp,
@@ -36,55 +38,106 @@ const iconMap: Record<string, any> = {
 
 export const CRMStructuresSelector: React.FC<{ onSelect?: () => void }> = ({ onSelect }) => {
   const { structures, activeStructure, switchStructure } = useCRMStore();
+  const [isOpen, setIsOpen] = useState(false);
 
-  const Icon = activeStructure ? iconMap[activeStructure.slug] || LayoutGrid : LayoutGrid;
+  const handleSelect = (s: any) => {
+    switchStructure(s);
+    if (onSelect) onSelect();
+    setIsOpen(false);
+  };
+
+  const Trigger = () => (
+    <button 
+      onClick={() => setIsOpen(true)}
+      className="flex items-center gap-3 text-[14px] font-bold text-blue-600 hover:text-blue-700 transition-all uppercase tracking-tight outline-none h-10 px-5 rounded-full bg-blue-50/50 border border-blue-100 hover:border-blue-200 group whitespace-nowrap"
+    >
+      <LayoutGrid size={16} className="text-blue-500" />
+      <span className="truncate max-w-[120px] md:max-w-none">{activeStructure?.name || 'Scegli Pipeline'}</span>
+      <ChevronDown size={14} className="text-blue-400 group-hover:translate-y-0.5 transition-transform shrink-0" />
+    </button>
+  );
 
   return (
     <div className="flex items-center gap-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 text-[14px] font-black text-blue-600 hover:text-blue-700 transition-colors uppercase tracking-tight outline-none h-10 group">
-            <span>Pipeline</span>
-            <ChevronDown size={16} className="text-blue-400 group-hover:translate-y-0.5 transition-transform" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-[300px] p-2 rounded-xl shadow-2xl border-slate-100 z-[100]">
-          <div className="px-3 py-2 mb-2 border-b border-slate-50">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Seleziona Pipeline</span>
+      <Trigger />
+      
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="max-w-[95vw] md:max-w-[600px] p-0 rounded-[32px] overflow-hidden border-none shadow-2xl bg-[#f8fafc] z-[200]">
+          <div className="bg-white px-8 py-6 border-b border-slate-100 flex items-center justify-between sticky top-0 z-10">
+            <DialogHeader className="p-0 space-y-0 text-left">
+              <DialogTitle className="text-[18px] font-black text-slate-800 uppercase tracking-tight">
+                Piattaforme CRM Nexus
+              </DialogTitle>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                {structures.length} Pipeline disponibili nel sistema
+              </p>
+            </DialogHeader>
+            <button 
+              onClick={() => setIsOpen(false)}
+              className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all border border-slate-100"
+            >
+              <X size={20} />
+            </button>
           </div>
-          <div className="grid grid-cols-1 gap-1 max-h-[400px] overflow-y-auto nexus-scrollbar">
-            {structures.map((s) => {
-              const Sicon = iconMap[s.slug] || LayoutGrid;
-              const isActive = activeStructure?.id === s.id;
-              
-              return (
-                <DropdownMenuItem 
-                  key={s.id}
-                  onClick={() => {
-                    switchStructure(s);
-                    if (onSelect) onSelect();
-                  }}
-                  className={cn(
-                    "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all",
-                    isActive ? "bg-blue-50 text-blue-700" : "hover:bg-slate-50 text-slate-600"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
+
+          <ScrollArea className="h-[70vh] md:max-h-[500px] w-full px-6 py-6 border-none">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-8">
+              {structures.map((s) => {
+                const Sicon = iconMap[s.slug] || LayoutGrid;
+                const isActive = activeStructure?.id === s.id;
+                
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSelect(s)}
+                    className={cn(
+                      "w-full flex items-center gap-4 p-5 rounded-3xl transition-all text-left group",
+                      isActive 
+                        ? "bg-blue-600 text-white shadow-xl shadow-blue-100" 
+                        : "bg-white border border-slate-100 shadow-xs text-slate-600 hover:border-blue-200 hover:shadow-md active:scale-[0.98]"
+                    )}
+                  >
                     <div 
-                      className="w-7 h-7 rounded-md flex items-center justify-center text-white"
-                      style={{ backgroundColor: s.color }}
+                      className={cn(
+                        "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0 transition-transform group-hover:scale-105",
+                        isActive ? "bg-white/20" : ""
+                      )}
+                      style={!isActive ? { backgroundColor: s.color } : {}}
                     >
-                      <Sicon size={14} />
+                      <Sicon size={22} />
                     </div>
-                    <span className="text-[11px] font-black uppercase tracking-tight">{s.name}</span>
-                  </div>
-                  {isActive && <Check size={16} className="text-blue-500" />}
-                </DropdownMenuItem>
-              );
-            })}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[14px] font-black uppercase tracking-tight block leading-tight truncate">
+                        {s.name}
+                      </span>
+                      <span className={cn(
+                        "text-[9px] font-bold uppercase tracking-widest mt-1 block",
+                        isActive ? "text-white/70" : "text-slate-400"
+                      )}>
+                        {isActive ? 'In uso' : 'Seleziona'}
+                      </span>
+                    </div>
+                    {isActive && (
+                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                        <Check size={14} strokeWidth={4} />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </ScrollArea>
+          
+          <div className="bg-white/80 backdrop-blur-sm px-8 py-4 border-t border-slate-100 flex items-center justify-center shrink-0">
+            <button 
+              onClick={() => setIsOpen(false)}
+              className="text-[11px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors flex items-center gap-2"
+            >
+              Uscita senza selezione <X size={12} />
+            </button>
           </div>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,10 +1,21 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { CRMDeal } from '@/types/crm';
+import { CRMDeal, CRMUser } from '@/types/crm';
 import { useCRMStore } from '@/stores/crmStore';
+import { CRM_USERS } from '@/constants/crm';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { supabaseCRMService } from '@/services/supabaseCRMService';
+import { toast } from 'sonner';
 import { 
   Building2, 
   Phone, 
@@ -13,8 +24,11 @@ import {
   User,
   AlertCircle,
   CheckCircle2,
-  Calendar
+  Calendar,
+  UserPlus,
+  AlertTriangle
 } from 'lucide-react';
+import { getInactivityData } from '@/lib/reminderUtils';
 
 interface DealCardProps {
   deal: CRMDeal;
@@ -22,8 +36,70 @@ interface DealCardProps {
 }
 
 export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
-  const { structures } = useCRMStore();
+  const { structures, stages, fetchInitialData, activeStructure } = useCRMStore();
   const structure = structures.find(s => s.id === deal.structure_id);
+  const currentStage = stages.find(s => s.id === deal.stage_id);
+  const stageName = currentStage?.name || '';
+
+  // Handle automatic reminders
+  React.useEffect(() => {
+    if (deal.id && stageName) {
+      // Small delay to ensure DB isn't hammered on initial massive load
+      const timer = setTimeout(() => {
+        supabaseCRMService.checkAndTriggerReminders(deal, stageName);
+      }, 2000 + Math.random() * 3000); // Random delay 2-5s to distribute triggers
+      return () => clearTimeout(timer);
+    }
+  }, [deal.id, stageName, deal.updated_at]);
+
+  // Get assigned user data
+  const assignedTo = CRM_USERS.find(u => u.id === deal.assigned_to || u.name === deal.assigned_to) || CRM_USERS[0];
+
+  const handleAssignChange = async (userId: string) => {
+    try {
+      await supabaseCRMService.updateDeal(deal.id, { assigned_to: userId });
+      toast.success("Responsabile aggiornato");
+      fetchInitialData(activeStructure?.slug);
+    } catch (e) {
+      toast.error("Errore aggiornamento responsabile");
+    }
+  };
+
+  const UserAvatar = ({ className }: { className?: string }) => (
+    <DropdownMenu>
+       <DropdownMenuTrigger asChild>
+        <Avatar className={cn("cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all shadow-sm", className)}>
+          <AvatarImage src={assignedTo.avatar} />
+          <AvatarFallback className="bg-blue-100 text-blue-600 font-black text-[8px] xl:text-[9px]">
+            {assignedTo.name.substring(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+       </DropdownMenuTrigger>
+       <DropdownMenuContent align="end" className="w-[200px] rounded-xl shadow-2xl p-1 border-slate-100">
+         <DropdownMenuLabel className="text-[10px] uppercase font-black text-slate-400 tracking-widest px-3 py-2">Cambia Responsabile</DropdownMenuLabel>
+         <DropdownMenuSeparator />
+         {CRM_USERS.map(user => (
+           <DropdownMenuItem 
+            key={user.id} 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAssignChange(user.id);
+            }}
+            className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-blue-50"
+           >
+             <Avatar className="h-6 w-6">
+               <AvatarImage src={user.avatar} />
+               <AvatarFallback className="text-[8px]">{user.name.substring(0,1)}</AvatarFallback>
+             </Avatar>
+             <div className="flex flex-col">
+               <span className="text-[11px] font-bold text-slate-700">{user.name}</span>
+               <span className="text-[8px] font-black uppercase text-slate-400 tracking-tighter">{user.role}</span>
+             </div>
+           </DropdownMenuItem>
+         ))}
+       </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: deal.id,
@@ -39,6 +115,14 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
     borderLeftColor: structure?.color || '#cbd5e1'
   };
 
+  const getBadgeColor = () => {
+    const s = stageName.toLowerCase();
+    if (s.includes('vinto')) return "bg-emerald-50 text-emerald-600";
+    if (s.includes('perso')) return "bg-rose-50 text-rose-600";
+    return "bg-blue-50 text-blue-600";
+  };
+
+  // PREANALYSIS CARD
   if (isPreanalysis && deal.preanalysis_result) {
     const res = deal.preanalysis_result;
     return (
@@ -48,59 +132,61 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
         {...listeners}
         {...attributes}
         className={cn(
-          "bg-white rounded-lg shadow-sm border-l-4 p-4 space-y-3 cursor-grab active:cursor-grabbing transition-all hover:shadow-md",
-          isDragging && "opacity-50 grayscale scale-95"
+          "bg-white rounded-lg shadow-sm border-l-4 cursor-grab active:cursor-grabbing transition-all",
+          "p-2.5 md:p-[10px] xl:p-3", // Responsive padding
+          "xl:hover:shadow-md", // No hover shadow on mobile
+          isDragging && "opacity-50 grayscale scale-95 z-50",
+          "flex flex-col gap-2 md:gap-3"
         )}
       >
         <div className="flex justify-between items-start gap-2">
-          <div className="flex flex-col">
-            <h3 className="font-black text-slate-800 text-[13px] leading-tight flex-1 uppercase tracking-tight">
+          <div className="flex flex-col min-w-0">
+            <h3 className="font-black text-slate-800 text-[11px] md:text-[12px] xl:text-[13px] leading-tight uppercase tracking-tight truncate">
               {res.company_data.name}
             </h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-              {structure?.name}
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+              {res.request_type}
             </span>
+            {getInactivityData(deal, currentStage?.name || '')?.isExpired && (
+              <Badge className="mt-1 bg-red-50 text-red-600 border-red-100 text-[8px] xl:text-[9px] font-black uppercase flex items-center gap-1 w-fit">
+                <AlertTriangle size={8} />
+                <span className="xl:hidden">Inattivo</span>
+                <span className="hidden xl:inline">⚠ inattivo {getInactivityData(deal, currentStage?.name || '')?.daysInactivity} giorni</span>
+              </Badge>
+            )}
           </div>
-          <Badge className="bg-blue-50 text-blue-600 text-[10px] font-black uppercase px-2 py-0.5 border-none shadow-none">
+          <Badge className={cn("text-[9px] xl:text-[10px] font-black uppercase px-2 py-0.5 border-none shadow-none shrink-0", getBadgeColor())}>
             {res.score}%
           </Badge>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] text-slate-600 font-bold overflow-hidden">
-            <User size={12} className="text-slate-400 shrink-0" />
+        {/* Contact info - hidden on smallest mobile screens for extra compactness as requested */}
+        <div className="hidden md:flex flex-col gap-1.5 pt-1">
+          <div className="flex items-center gap-2 text-[10px] xl:text-[11px] text-slate-600 font-bold overflow-hidden">
+            <User size={10} className="text-slate-400 shrink-0" />
             <span className="truncate">{res.contact_data.name}</span>
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
-            <Phone size={12} className="text-slate-400 shrink-0" />
-            <span>{res.contact_data.phone}</span>
-          </div>
         </div>
 
-        <div className="pt-2 border-t border-slate-50">
-           <div className="bg-slate-50 p-2 rounded-md border border-slate-100">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[9px] font-black text-slate-400 uppercase">Tipo richiesta</span>
-            </div>
-            <span className="text-[11px] font-black text-blue-600 leading-tight block uppercase">{res.request_type}</span>
-          </div>
+        {/* Mobile-only compact view extras */}
+        <div className="md:hidden flex items-center gap-2 text-[10px] text-slate-500 font-medium">
+          <Phone size={10} className="text-slate-400 shrink-0" />
+          <span>{res.contact_data.phone}</span>
         </div>
 
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-200 uppercase tracking-tighter">
-            <Calendar size={10} />
-            {new Date(deal.created_at).toLocaleDateString('it-IT')}
-          </div>
+        <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+          <span className="text-[10px] xl:text-xs font-black text-blue-600 italic">
+            €{res.estimated_amount?.toLocaleString() || '0'}
+          </span>
           <div className="flex items-center -space-x-2">
-            <Avatar className="h-6 w-6 rounded-md border-2 border-white">
-              <AvatarFallback className="bg-blue-50 text-blue-600 text-[10px] font-black">A</AvatarFallback>
-            </Avatar>
+            <UserAvatar className="h-6 w-6 xl:h-8 xl:w-8" />
           </div>
         </div>
       </div>
     );
   }
 
+  // STANDARD DEAL CARD
   return (
     <div
       ref={setNodeRef}
@@ -108,40 +194,76 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
       {...listeners}
       {...attributes}
       className={cn(
-        "bg-white rounded-lg shadow-sm border-l-4 border-slate-200 p-3 space-y-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-all",
-        isDragging && "opacity-50 grayscale"
+        "bg-white rounded-lg shadow-sm border-l-4 border-slate-200 cursor-grab active:cursor-grabbing transition-all",
+        "p-2.5 md:p-[10px] xl:p-3", // Responsive padding
+        "xl:hover:shadow-md",
+        isDragging && "opacity-50 grayscale z-50",
+        "flex flex-col gap-2 md:gap-3"
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col">
-          <h4 className="text-[13px] font-black text-slate-800 leading-tight flex-1 uppercase tracking-tight">{deal.title}</h4>
-          <span className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{structure?.name}</span>
+        <div className="flex flex-col min-w-0">
+          <h4 className="text-[11px] md:text-[12px] xl:text-[13px] font-black text-slate-800 leading-tight uppercase tracking-tight truncate">
+            {deal.company || deal.title}
+          </h4>
+          <span className="text-[9px] font-bold text-slate-400 mt-0.5 xl:mt-1 uppercase tracking-widest truncate">
+            {structure?.name || 'Affare'}
+          </span>
+          {getInactivityData(deal, currentStage?.name || '')?.isExpired && (
+            <Badge className="mt-1 bg-red-50 text-red-600 border-red-100 text-[8px] xl:text-[10px] font-black uppercase flex items-center gap-1 w-fit">
+              <AlertTriangle size={8} className="xl:h-3 xl:w-3" />
+              <span className="inline">⚠ inattivo {getInactivityData(deal, currentStage?.name || '')?.daysInactivity} giorni</span>
+            </Badge>
+          )}
         </div>
+        
+        {/* Value on top right for desktop for better visual balance */}
+        <div className="hidden xl:block shrink-0">
+          <span className="text-[12px] font-black text-emerald-600 tracking-tight">€{deal.value.toLocaleString()}</span>
+        </div>
+
         {deal.preanalysis_result && (
-          <Badge className="bg-blue-50 text-blue-600 text-[10px] font-black uppercase px-1.5 py-0 border-none shadow-none">
+          <Badge className={cn("xl:hidden text-[9px] font-black uppercase px-1.5 py-0 border-none shadow-none", getBadgeColor())}>
             {deal.preanalysis_result.score}%
           </Badge>
         )}
       </div>
 
-      <div className="space-y-1.5 pt-1">
+      <div className="space-y-1 md:space-y-1.5 pt-1">
         <div className="flex items-center gap-2">
-          <Building2 size={12} className="text-slate-400 shrink-0" />
-          <span className="text-[11px] font-bold text-slate-600 truncate">{deal.company}</span>
+          <User size={10} className="text-slate-400 shrink-0" />
+          <span className="text-[10px] md:text-[11px] font-bold text-slate-600 truncate">{deal.contact || '-'}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <User size={12} className="text-slate-400 shrink-0" />
-          <span className="text-[10px] font-medium text-slate-500 truncate">{deal.contact}</span>
+        
+        {/* Mobile-only compact view extra: Phone */}
+        <div className="md:hidden flex items-center gap-2 pt-0.5">
+          <Phone size={10} className="text-slate-400 shrink-0" />
+          <span className="text-[9px] font-medium text-blue-500 truncate">{deal.phone || '-'}</span>
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-        <span className="text-[12px] font-black text-emerald-600 tracking-tight">€{deal.value.toLocaleString()}</span>
-        <div className="flex items-center -space-x-1.5">
-          <Avatar className="h-6 w-6 rounded-md border-2 border-white">
-            <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${deal.assigned_to}`} />
-            <AvatarFallback className="text-[9px] font-black bg-blue-100 text-blue-600">A</AvatarFallback>
-          </Avatar>
+      <div className="flex items-center justify-between pt-2 border-t border-slate-50 mt-auto">
+        <div className="flex flex-col xl:flex-row xl:items-center gap-1 xl:gap-2">
+          {/* Lower value display for Tablet/Mobile */}
+          <span className="xl:hidden text-[11px] md:text-[11px] font-black text-emerald-600 tracking-tight">€{deal.value.toLocaleString()}</span>
+          
+          <div className="flex items-center gap-1.5 text-[8px] xl:text-[9px] font-black text-slate-300 uppercase tracking-tight">
+             <Calendar size={10} />
+             {new Date(deal.created_at).toLocaleDateString([], { day: '2-digit', month: '2-digit' })}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Desktop specific: High score badge at bottom if exists */}
+          {deal.preanalysis_result && (
+            <Badge className={cn("hidden xl:flex text-[10px] font-black uppercase px-1.5 py-0 border-none shadow-none h-5", getBadgeColor())}>
+              {deal.preanalysis_result.score}%
+            </Badge>
+          )}
+
+          <div className="flex items-center -space-x-1.5">
+            <UserAvatar className="h-6 w-6 xl:h-8 xl:w-8" />
+          </div>
         </div>
       </div>
     </div>

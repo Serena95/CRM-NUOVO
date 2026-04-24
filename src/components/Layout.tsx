@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   LayoutDashboard, 
@@ -70,6 +70,7 @@ import {
   PlusCircle
 } from 'lucide-react';
 import ChatAgente from './crm/ChatAgente';
+import NotificationCenter from './NotificationCenter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -89,6 +90,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
+import { GlobalSearch } from './crm/GlobalSearch';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -184,6 +186,28 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         break;
     }
   };
+
+  const handleDealClick = (dealId: string, structureSlug?: string) => {
+    if (structureSlug) {
+      setActiveTab(`pipeline-${structureSlug}`);
+    } else {
+      setActiveTab('affari');
+    }
+    
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('crm:openDeal', { detail: { dealId } }));
+    }, 500);
+  };
+
+  useEffect(() => {
+    const handleGlobalOpenDeal = (event: any) => {
+      const { dealId, structureSlug } = event.detail;
+      handleDealClick(dealId, structureSlug);
+    };
+
+    window.addEventListener('crm:openDealGlobal', handleGlobalOpenDeal);
+    return () => window.removeEventListener('crm:openDealGlobal', handleGlobalOpenDeal);
+  }, []);
 
   const navItems = [
     { id: 'dashboard', label: 'Monitoraggio CRM', icon: Home, subItems: [
@@ -402,16 +426,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
             >
               <Menu size={20} />
             </Button>
-            
-            <div className="flex-1 max-w-2xl hidden md:block">
-              <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 group-focus-within:text-white transition-colors" size={16} />
-                <Input 
-                  placeholder="Trova persone, documenti e altro" 
-                  className="pl-10 bg-white/10 border-none focus-visible:ring-1 focus-visible:ring-white/20 text-white placeholder:text-white/50 h-9 rounded-full backdrop-blur-md"
-                />
-              </div>
+
+            <div className="xs:hidden">
+              <NotificationCenter onDealClick={handleDealClick} isMobile={true} />
             </div>
+
+            <GlobalSearch />
           </div>
 
           <div className="flex items-center gap-2 lg:gap-4">
@@ -420,10 +440,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
               <span>08:45</span>
             </div>
 
-            <Button variant="ghost" size="icon" className="relative text-white/70 hover:text-white hidden xs:flex">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#2D3E8B]"></span>
-            </Button>
+            <div className="hidden xs:flex">
+              <NotificationCenter onDealClick={handleDealClick} isMobile={false} />
+            </div>
 
             <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hidden sm:flex">
               <HelpCircle size={20} />

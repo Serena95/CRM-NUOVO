@@ -484,9 +484,40 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "postId", "authorId", "content", "createdAt"]
+    },
+    "CRMNotification": {
+      "title": "CRMNotification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "dealId": { "type": "string" },
+        "dealTitle": { "type": "string" },
+        "structureId": { "type": "string" },
+        "structureSlug": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdBy": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "name": { "type": "string" },
+            "avatar": { "type": "string" }
+          },
+          "required": ["id", "name"]
+        },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "title", "description", "dealId", "dealTitle", "userId", "read", "createdAt", "createdBy"]
     }
   },
   "firestore": {
+    "/notifications/{notifId}": {
+      "schema": "CRMNotification",
+      "description": "Real-time CRM notifications."
+    },
     "/social_users/{userId}": {
       "schema": "SocialUser",
       "description": "Social media user profiles."

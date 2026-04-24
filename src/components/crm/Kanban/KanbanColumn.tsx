@@ -20,29 +20,32 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, deals, onCard
   const totalValue = deals.reduce((acc, deal) => acc + (deal.value || 0), 0);
 
   return (
-    <div className="flex flex-col w-[300px] shrink-0 h-full">
-      {/* Column Header */}
-      <div className="bg-white border-b border-slate-200 p-4 sticky top-0 z-10 shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
+    <div className={cn(
+      "flex flex-col shrink-0 select-none",
+      "w-[320px] min-w-[320px] pb-4"
+    )}>
+      {/* Column Header - Always visible at top */}
+      <div className="bg-white border-b border-slate-200 p-[8px_12px] relative z-[2] shrink-0">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2 min-w-0">
              <div 
-              className="w-1.5 h-6 rounded-full" 
+              className="w-1.5 h-6 rounded-full shrink-0" 
               style={{ backgroundColor: stage.color || '#cbd5e1' }} 
             />
-            <h3 className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-800 truncate max-w-[160px]">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-800 truncate">
               {stage.name}
             </h3>
-            <span className="bg-slate-100 text-slate-400 text-[10px] font-black px-1.5 py-0.5 rounded">
+            <span className="bg-slate-100 text-slate-400 text-[10px] font-black px-1.5 py-0.5 rounded shrink-0">
               {deals.length}
             </span>
           </div>
-          <button className="text-slate-300 hover:text-slate-500 transition-colors">
+          <button className="text-slate-300 hover:text-slate-500 transition-colors shrink-0">
             <MoreHorizontal size={16} />
           </button>
         </div>
         
         <div className="flex items-center justify-between">
-          <span className="text-[13px] font-black text-slate-400">
+          <span className="text-[12px] font-black text-slate-400">
             €{totalValue.toLocaleString()}
           </span>
           {!stage.name.toLowerCase().includes('preanalisi') && (
@@ -50,22 +53,22 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, deals, onCard
               onClick={onAddDeal}
               className="w-6 h-6 rounded-md bg-blue-50 text-blue-500 flex items-center justify-center hover:bg-blue-100 transition-colors"
             >
-              <Plus size={14} />
+              <Plus size={12} className="size-3.5" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Column Body */}
+      {/* Column Body - Cards list */}
       <div 
         ref={setNodeRef}
         className={cn(
-          "flex-1 p-3 space-y-3 overflow-y-auto no-scrollbar transition-colors",
+          "flex flex-col gap-2 p-2 transition-colors min-h-[100px]",
           isOver && "bg-blue-50/50"
         )}
       >
         {deals.map(deal => (
-          <div key={deal.id} onClick={() => onCardClick?.(deal)}>
+          <div key={deal.id} onClick={() => onCardClick?.(deal)} className="flex flex-col">
             <DealCard 
               deal={deal} 
               isPreanalysis={stage.name.toLowerCase().includes('preanalisi')}
@@ -75,7 +78,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({ stage, deals, onCard
         
         {/* Placeholder for empty column when dragging over */}
         {deals.length === 0 && (
-          <div className="h-32 rounded-lg border-2 border-dashed border-slate-100 flex items-center justify-center text-slate-300 italic text-xs">
+          <div className="h-24 rounded-lg border-2 border-dashed border-slate-100 flex items-center justify-center text-slate-300 italic text-[10px]">
             Trascina qui un affare
           </div>
         )}

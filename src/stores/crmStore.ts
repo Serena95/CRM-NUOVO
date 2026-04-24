@@ -6,6 +6,24 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
+interface CRMFilters {
+  search: string;
+  responsabile: string[];
+  stage: string[];
+  valore: [number, number];
+  dataCreazione: { from?: Date; to?: Date };
+  ultimaAttivita: string;
+  scorePreanalisi: [number, number];
+  struttura: string[];
+  stato: string[];
+}
+
+interface SavedFilter {
+  id: string;
+  label: string;
+  filters: Partial<CRMFilters>;
+}
+
 interface CRMState {
   structures: CRMStructure[];
   activeStructure: CRMStructure | null;
@@ -15,18 +33,53 @@ interface CRMState {
   initialLoadDone: boolean;
   error: string | null;
   subscription: RealtimeChannel | null;
+  
+  // Filters
+  filters: CRMFilters;
+  savedFilters: SavedFilter[];
+  activeSavedFilterId: string | null;
+
+  // Global Search
+  globalSearchQuery: string;
+  globalSearchResults: any[];
+  isGlobalSearching: boolean;
+
+  crmView: 'kanban' | 'list' | 'calendar';
 
   setStructures: (structures: CRMStructure[]) => void;
   setActiveStructure: (structure: CRMStructure) => void;
   setStages: (stages: CRMStage[]) => void;
   setDeals: (deals: CRMDeal[]) => void;
   
+  setFilters: (filters: Partial<CRMFilters>) => void;
+  setCRMView: (view: 'kanban' | 'list' | 'calendar') => void;
+  resetFilters: () => void;
+  applySavedFilter: (id: string) => void;
+  saveCurrentFilter: (label: string) => void;
+  
+  setGlobalSearchQuery: (query: string) => void;
+  searchGlobal: (query: string) => Promise<void>;
+  
   fetchInitialData: (preferredStructureSlug?: string, force?: boolean) => Promise<void>;
   switchStructure: (structure: CRMStructure) => Promise<void>;
   moveDeal: (dealId: string, toStageId: string) => Promise<void>;
   subscribeToChanges: (structureId: string) => void;
   unsubscribeFromChanges: () => void;
+  
+  getFilteredDeals: () => CRMDeal[];
 }
+
+const DEFAULT_FILTERS: CRMFilters = {
+  search: '',
+  responsabile: [],
+  stage: [],
+  valore: [0, 1000000],
+  dataCreazione: {},
+  ultimaAttivita: 'all',
+  scorePreanalisi: [0, 100],
+  struttura: [],
+  stato: []
+};
 
 export const useCRMStore = create<CRMState>((set, get) => ({
   structures: [],
@@ -38,10 +91,147 @@ export const useCRMStore = create<CRMState>((set, get) => ({
   error: null,
   subscription: null,
 
+  // Filters state
+  filters: DEFAULT_FILTERS,
+  savedFilters: [
+    { id: 'miei', label: 'I miei affari', filters: { responsabile: ['user-1'] } }, // Example for Marco
+    { id: 'richiamare', label: 'Da richiamare', filters: { stage: ['verifica-telefonica'] } },
+    { id: 'trattativa', label: 'In trattativa', filters: { stage: ['invio-preventivo'] } },
+    { id: 'contratti', label: 'Contratti', filters: { stage: ['contratto'] } },
+    { id: 'vinti', label: 'Vinti', filters: { stage: ['affare-vinto'] } },
+  ],
+  activeSavedFilterId: null,
+
+  globalSearchQuery: '',
+  globalSearchResults: [],
+  isGlobalSearching: false,
+  crmView: 'kanban',
+
   setStructures: (structures) => set({ structures }),
   setActiveStructure: (activeStructure) => set({ activeStructure }),
   setStages: (stages) => set({ stages }),
   setDeals: (deals) => set({ deals }),
+
+  setFilters: (newFilters) => set((state) => ({ 
+    filters: { ...state.filters, ...newFilters },
+    activeSavedFilterId: null 
+  })),
+
+  setCRMView: (crmView) => set({ crmView }),
+
+  resetFilters: () => set({ filters: DEFAULT_FILTERS, activeSavedFilterId: null }),
+
+  applySavedFilter: (id) => {
+    const saved = get().savedFilters.find(f => f.id === id);
+    if (saved) {
+      set({ 
+        filters: { ...DEFAULT_FILTERS, ...saved.filters },
+        activeSavedFilterId: id
+      });
+    }
+  },
+
+  saveCurrentFilter: (label) => {
+    const newFilter: SavedFilter = {
+      id: `custom-${Date.now()}`,
+      label,
+      filters: { ...get().filters }
+    };
+    set((state) => ({
+      savedFilters: [...state.savedFilters, newFilter],
+      activeSavedFilterId: newFilter.id
+    }));
+  },
+
+  setGlobalSearchQuery: (query) => set({ globalSearchQuery: query }),
+
+  searchGlobal: async (query) => {
+    if (!query || query.length < 2) {
+      set({ globalSearchResults: [], isGlobalSearching: false });
+      return;
+    }
+    set({ isGlobalSearching: true });
+    try {
+      const results = await supabaseCRMService.searchGlobalDeals(query);
+      set({ globalSearchResults: results });
+    } catch (e) {
+      console.error("Global search error:", e);
+    } finally {
+      set({ isGlobalSearching: false });
+    }
+  },
+
+  getFilteredDeals: () => {
+    const { deals, filters, stages } = get();
+    return deals.filter(deal => {
+      // Search text
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesSearch = 
+          deal.title?.toLowerCase().includes(searchLower) ||
+          deal.company?.toLowerCase().includes(searchLower) ||
+          deal.contact?.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
+
+      // Responsabile
+      if (filters.responsabile.length > 0 && !filters.responsabile.includes(deal.assigned_to)) {
+        return false;
+      }
+
+      // Stage
+      if (filters.stage.length > 0 && !filters.stage.includes(deal.stage_id)) {
+        return false;
+      }
+
+      // Valore
+      if (deal.value < filters.valore[0] || deal.value > filters.valore[1]) {
+        return false;
+      }
+
+      // Score Preanalisi
+      if (deal.preanalysis_result) {
+        const score = deal.preanalysis_result.score;
+        if (score < filters.scorePreanalisi[0] || score > filters.scorePreanalisi[1]) {
+          return false;
+        }
+      }
+
+      // Data Creazione
+      if (filters.dataCreazione.from || filters.dataCreazione.to) {
+        const created = new Date(deal.created_at);
+        if (filters.dataCreazione.from && created < filters.dataCreazione.from) return false;
+        if (filters.dataCreazione.to && created > filters.dataCreazione.to) return false;
+      }
+
+      // Stato (Vinto/Perso/Attivo)
+      if (filters.stato.length > 0) {
+        const stage = stages.find(s => s.id === deal.stage_id);
+        const dealStatus = stage?.is_won ? 'vinto' : (stage?.is_lost ? 'perso' : 'attivo');
+        if (!filters.stato.includes(dealStatus)) return false;
+      }
+
+      // Ultima Attività
+      if (filters.ultimaAttivita !== 'all') {
+        const lastUpdate = new Date(deal.updated_at || deal.created_at);
+        const diffDays = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24);
+        
+        if (filters.ultimaAttivita === 'today' && diffDays > 1) return false;
+        if (filters.ultimaAttivita === 'week' && diffDays > 7) return false;
+        if (filters.ultimaAttivita === 'month' && diffDays > 30) return false;
+        if (filters.ultimaAttivita === 'inactive' && diffDays < 5) return false;
+      }
+
+      // Struttura (slug)
+      if (filters.struttura.length > 0 && !filters.struttura.includes(deal.structure_id)) {
+        // Note: deal.structure_id is usually a UUID, structure slug might be what filters.struttura contains
+        // We'll check if the deal's structure matches any of the selected structure IDs
+        return false;
+      }
+
+      return true;
+    });
+  },
 
   subscribeToChanges: (structureId) => {
     // Clean up previous subscription

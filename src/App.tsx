@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import Layout from '@/components/Layout';
-import { db } from '@/lib/firebase';
-import { doc, getDocFromServer } from 'firebase/firestore';
 import Dashboard from '@/pages/Dashboard';
 import CRM from '@/pages/CRM';
 import Tasks from '@/pages/Tasks';
@@ -39,19 +37,6 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('nexus_active_tab', activeTab);
   }, [activeTab]);
-
-  useEffect(() => {
-    async function testConnection() {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Firestore connection error: The client is offline or configuration is incorrect.");
-        }
-      }
-    }
-    testConnection();
-  }, []);
 
   if (loading) {
     return (
