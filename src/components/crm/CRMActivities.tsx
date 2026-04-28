@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabaseCRMService } from '@/services/supabaseCRMService';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/firebase';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { 
   Phone, 
   CheckSquare, 
@@ -32,38 +33,22 @@ export const CRMActivities: React.FC<{ dealId: string }> = ({ dealId }) => {
   const [activities, setActivities] = useState<CRMActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadActivities = async () => {
-    try {
-      const data = await supabaseCRMService.getDealActivities(dealId);
-      setActivities(data as any[]);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   useEffect(() => {
     setLoading(true);
-    loadActivities().finally(() => setLoading(false));
+    
+    const q = query(
+      collection(db, 'crm_activities'), 
+      where('deal_id', '==', dealId), 
+      orderBy('created_at', 'desc')
+    );
 
-    const channel = supabase
-      .channel(`activities-${dealId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'crm_activities',
-          filter: `deal_id=eq.${dealId}`
-        },
-        () => {
-          loadActivities();
-        }
-      )
-      .subscribe();
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      setActivities(data);
+      setLoading(false);
+    });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => unsubscribe();
   }, [dealId]);
 
   const getIcon = (type: string, title?: string) => {

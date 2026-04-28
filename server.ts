@@ -3,9 +3,27 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  getDocs, 
+  getDoc,
+  setDoc,
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  where, 
+  limit, 
+  orderBy,
+  serverTimestamp 
+} from 'firebase/firestore';
 import fs from 'fs';
 import cors from 'cors';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,13 +35,145 @@ const firebaseConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'firebase
 const app_firebase = initializeApp(firebaseConfig);
 const db = getFirestore(app_firebase, firebaseConfig.firestoreDatabaseId);
 
+// Webhook Helper
+async function triggerWebhook(event: string, payload: any) {
+  const webhookUrl = process.env.CRM_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, payload, timestamp: new Date().toISOString() })
+    });
+    console.log(`Webhook triggered: ${event}`);
+  } catch (err) {
+    console.error(`Failed to trigger webhook: ${event}`, err);
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Abilitiamo CORS per permettere l'invio da siti esterni
   app.use(cors());
   app.use(express.json());
+
+  // Auth Middleware
+  const authenticateAPI = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const authHeader = req.headers.authorization;
+    const token = process.env.API_TOKEN || 'nexus-crm-token-2024'; // Default for demo
+
+    if (!authHeader || authHeader !== `Bearer ${token}`) {
+      return res.status(401).json({ error: "Unauthorized. Valid API Token required." });
+    }
+    next();
+  };
+
+  // --- CRM PUBLIC API ROUTES (FIRESTORE) ---
+
+  // GET /crm/deal
+  app.get("/api/crm/deal", authenticateAPI, async (req, res) => {
+    try {
+      const q = query(collection(db, 'crm_deals'), limit(100));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch deals" });
+    }
+  });
+
+  // POST /crm/deal
+  app.post("/api/crm/deal", authenticateAPI, async (req, res) => {
+    try {
+      const dealData = {
+        ...req.body,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      const docRef = await addDoc(collection(db, 'crm_deals'), dealData);
+      const newDeal = { id: docRef.id, ...dealData };
+
+      await triggerWebhook('deal.created', newDeal);
+      res.status(201).json(newDeal);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create deal" });
+    }
+  });
+
+  // PUT /crm/deal
+  app.put("/api/crm/deal", authenticateAPI, async (req, res) => {
+    try {
+      const { id, ...updates } = req.body;
+      if (!id) return res.status(400).json({ error: "Deal ID required" });
+
+      const docRef = doc(db, 'crm_deals', id);
+      await updateDoc(docRef, { ...updates, updated_at: new Date().toISOString() });
+      
+      const updatedSnap = await getDoc(docRef);
+      const data = { id: updatedSnap.id, ...updatedSnap.data() };
+
+      await triggerWebhook('deal.updated', data);
+      
+      if (updates.stage_id) {
+        await triggerWebhook('deal.stage.changed', data);
+      }
+      
+      if (updates.status === 'won') await triggerWebhook('deal.won', data);
+      if (updates.status === 'lost') await triggerWebhook('deal.lost', data);
+
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update deal" });
+    }
+  });
+
+  // DELETE /crm/deal
+  app.delete("/api/crm/deal", authenticateAPI, async (req, res) => {
+    try {
+      const { id } = req.query;
+      if (!id || typeof id !== 'string') return res.status(400).json({ error: "Deal ID required as query param" });
+
+      await deleteDoc(doc(db, 'crm_deals', id));
+      res.json({ success: true, message: "Deal deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete deal" });
+    }
+  });
+
+  // POST /crm/form (Generic Webhook for Lead/Deal creation)
+  app.post("/api/crm/form", authenticateAPI, async (req, res) => {
+    try {
+      const { title, value, company_name, contact_name, phone, email, pipeline_id, stage_id } = req.body;
+      
+      const newDealData = {
+        title: title || `Nuovo Lead Form - ${contact_name || 'Anonimo'}`,
+        value: value || 0,
+        structure_id: pipeline_id || 'base-crm',
+        stage_id: stage_id || 'lead',
+        custom_fields: {
+          company: company_name || '',
+          contact: contact_name || '',
+          phone: phone || '',
+          email: email || ''
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const docRef = await addDoc(collection(db, 'crm_deals'), newDealData);
+      const data = { id: docRef.id, ...newDealData };
+
+      await triggerWebhook('deal.created', data);
+      res.status(201).json({ success: true, deal: data });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to process form webhook" });
+    }
+  });
+
+  // ------------------------------
 
   // Serviamo la cartella public (verrà usata per lo script JS pubblico)
   app.use(express.static(path.join(__dirname, 'public')));

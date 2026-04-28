@@ -33,14 +33,13 @@ const FeedPage: React.FC = () => {
       <div className="flex-1 overflow-y-auto nexus-scrollbar p-4 lg:p-8">
         <div className="max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-8">
           
-          {/* Main Feed Content */}
-          <div className="flex-1 space-y-8">
+          <div className="flex-1 space-y-8 max-w-[800px] mx-auto w-full">
             <FeedComposer />
             <FeedList />
           </div>
 
-          {/* Right Sidebar - Desktop Only */}
-          <div className="w-full lg:w-80 shrink-0 space-y-6 hidden lg:block">
+          {/* Right Sidebar - Desktop Only - MODIFIED to be simpler or hidden if needed */}
+          <div className="w-full lg:w-72 shrink-0 space-y-6 hidden xl:block">
             {/* User Quick Stats */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
               <div className="flex items-center gap-4 mb-6">

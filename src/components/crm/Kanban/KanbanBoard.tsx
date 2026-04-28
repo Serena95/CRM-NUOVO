@@ -18,15 +18,21 @@ import { Loader2, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DetailDrawer } from '../DetailDrawer';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { AutomationBuilder } from '../AutomationBuilder';
+import { CRMStage } from '@/types/crm';
 
 import { CreateItemModal } from '../CreateItemModal';
 
+import { useCRMPermissions } from '@/hooks/useCRMPermissions';
+
 export const KanbanBoard: React.FC = () => {
   const { stages, getFilteredDeals, activeStructure, moveDeal, isLoading } = useCRMStore();
+  const { canMoveStage } = useCRMPermissions();
   const deals = getFilteredDeals();
   const [activeDeal, setActiveDeal] = useState<CRMDeal | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedStageId, setSelectedStageId] = useState<string | undefined>(undefined);
+  const [automationStage, setAutomationStage] = useState<CRMStage | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(true);
@@ -51,10 +57,19 @@ export const KanbanBoard: React.FC = () => {
     const container = scrollContainerRef.current;
     if (container) {
       container.addEventListener('scroll', handleScroll);
+      window.addEventListener('resize', handleScroll);
+      
+      // Force check after a delay to ensure layout is settled
+      const timer = setTimeout(handleScroll, 500);
       handleScroll();
-      return () => container.removeEventListener('scroll', handleScroll);
+      
+      return () => {
+        container.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('resize', handleScroll);
+        clearTimeout(timer);
+      };
     }
-  }, [stages]);
+  }, [stages, deals.length]); // Re-run when deals or stages change
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -67,7 +82,14 @@ export const KanbanBoard: React.FC = () => {
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
-    setActiveDeal(active.data.current?.deal || null);
+    const deal = active.data.current?.deal as CRMDeal;
+    
+    // Check if user has permission to move this specific deal
+    if (!canMoveStage(deal)) {
+      return;
+    }
+    
+    setActiveDeal(deal || null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -111,43 +133,42 @@ export const KanbanBoard: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-[#f8fafc] kanban-wrapper">
-      {/* Scroll Navigation Arrows - Hidden on Mobile, Visible on Tablet/Desktop */}
+    <div className="flex-1 flex flex-col min-h-0 relative bg-[#f8fafc] h-full overflow-hidden">
+      {/* Absolute Arrows relative to this stable container */}
       {showLeftArrow && (
-        <Button
-          variant="secondary"
-          size="icon"
-          onClick={() => scroll('left')}
-          className={cn(
-            "absolute left-2 top-1/2 -translate-y-1/2 z-[10] rounded-full h-11 w-11 shadow-2xl bg-white border-slate-200 text-slate-500",
-            "hover:bg-slate-50 hover:text-blue-600 hover:scale-110 active:scale-95 transition-all",
-            "hidden md:flex" // Mobile hidden, Tablet/Desktop visible
-          )}
-        >
-          <ChevronLeft size={24} />
-        </Button>
+        <div className="absolute left-4 inset-y-0 flex items-center z-50 pointer-events-none">
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => scroll('left')}
+            className={cn(
+              "pointer-events-auto rounded-full h-14 w-14 shadow-[0_10px_40px_rgba(0,0,0,0.2)] bg-white/95 border-2 border-slate-100 text-blue-600 transition-all hover:scale-110 active:scale-95 flex",
+            )}
+          >
+            <ChevronLeft size={32} />
+          </Button>
+        </div>
       )}
 
       {showRightArrow && (
-        <Button
-          variant="secondary"
-          size="icon"
-          onClick={() => scroll('right')}
-          className={cn(
-            "absolute right-2 top-1/2 -translate-y-1/2 z-[10] rounded-full h-11 w-11 shadow-2xl bg-white border-slate-200 text-slate-500",
-            "hover:bg-slate-50 hover:text-blue-600 hover:scale-110 active:scale-95 transition-all",
-            "hidden md:flex" // Mobile hidden, Tablet/Desktop visible
-          )}
-        >
-          <ChevronRight size={24} />
-        </Button>
+        <div className="absolute right-4 inset-y-0 flex items-center z-50 pointer-events-none">
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => scroll('right')}
+            className={cn(
+              "pointer-events-auto rounded-full h-14 w-14 shadow-[0_10px_40px_rgba(0,0,0,0.2)] bg-white/95 border-2 border-slate-100 text-blue-600 transition-all hover:scale-110 active:scale-95 flex",
+            )}
+          >
+            <ChevronRight size={32} />
+          </Button>
+        </div>
       )}
 
+      {/* Scrollable Container (ROOT) - AREA KANBAN */}
       <div 
         ref={scrollContainerRef}
-        className={cn(
-          "flex-1 flex flex-row items-start gap-3 p-3 overflow-x-auto overflow-y-hidden no-scrollbar scroll-smooth relative"
-        )}
+        className="block flex-1 overflow-x-auto overflow-y-hidden p-4 no-scrollbar scroll-smooth h-full"
       >
         <DndContext
           sensors={sensors}
@@ -155,21 +176,24 @@ export const KanbanBoard: React.FC = () => {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          {stages.map((stage) => (
-            <KanbanColumn 
-              key={stage.id} 
-              stage={stage} 
-              deals={deals.filter(deal => deal.stage_id === stage.id)}
-              onCardClick={(deal) => {
-                window.dispatchEvent(new CustomEvent('crm:openDeal', { detail: { dealId: deal.id } }));
-              }}
-              onAddDeal={() => {
-                setSelectedStageId(stage.id);
-                setIsCreateModalOpen(true);
-              }}
-            />
-          ))}
-
+          {/* Inner Container (INNER) - KANBAN INNER */}
+          <div className="flex flex-row items-stretch gap-4 min-w-max h-full">
+            {stages.map((stage) => (
+              <KanbanColumn 
+                key={stage.id} 
+                stage={stage} 
+                deals={deals.filter(deal => deal.stage_id === stage.id)}
+                onCardClick={(deal) => {
+                  window.dispatchEvent(new CustomEvent('crm:openDeal', { detail: { dealId: deal.id } }));
+                }}
+                onAddDeal={() => {
+                  setSelectedStageId(stage.id);
+                  setIsCreateModalOpen(true);
+                }}
+                onOpenAutomation={(s) => setAutomationStage(s)}
+              />
+            ))}
+          </div>
 
           <DragOverlay>
             {activeDeal ? (
@@ -188,6 +212,13 @@ export const KanbanBoard: React.FC = () => {
         pipelineId={activeStructure?.id}
         stageId={selectedStageId}
       />
+
+      {automationStage && (
+        <AutomationBuilder 
+          stage={automationStage} 
+          onClose={() => setAutomationStage(null)} 
+        />
+      )}
     </div>
   );
 };

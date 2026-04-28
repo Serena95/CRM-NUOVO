@@ -35,8 +35,15 @@ interface DealCardProps {
   isPreanalysis?: boolean;
 }
 
+import { useCRMPermissions } from '@/hooks/useCRMPermissions';
+import { Lock } from 'lucide-react';
+
 export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
-  const { structures, stages, fetchInitialData, activeStructure } = useCRMStore();
+  const { structures, stages, fetchInitialData, activeStructure, customFields } = useCRMStore();
+  const { canModifyDeal, canAssignUsers } = useCRMPermissions();
+
+  const kanbanFields = customFields.filter(f => f.entity_type === 'deal' && f.show_in_kanban);
+  const isReadOnly = !canModifyDeal(deal);
   const structure = structures.find(s => s.id === deal.structure_id);
   const currentStage = stages.find(s => s.id === deal.stage_id);
   const stageName = currentStage?.name || '';
@@ -67,8 +74,12 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
 
   const UserAvatar = ({ className }: { className?: string }) => (
     <DropdownMenu>
-       <DropdownMenuTrigger asChild>
-        <Avatar className={cn("cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all shadow-sm", className)}>
+       <DropdownMenuTrigger asChild disabled={!canAssignUsers}>
+        <Avatar className={cn(
+          "transition-all shadow-sm", 
+          canAssignUsers ? "cursor-pointer hover:ring-2 hover:ring-blue-400" : "cursor-default opacity-80",
+          className
+        )}>
           <AvatarImage src={assignedTo.avatar} />
           <AvatarFallback className="bg-blue-100 text-blue-600 font-black text-[8px] xl:text-[9px]">
             {assignedTo.name.substring(0, 2).toUpperCase()}
@@ -198,9 +209,16 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
         "p-2.5 md:p-[10px] xl:p-3", // Responsive padding
         "xl:hover:shadow-md",
         isDragging && "opacity-50 grayscale z-50",
+        isReadOnly && "bg-slate-50/50 cursor-default opacity-90",
         "flex flex-col gap-2 md:gap-3"
       )}
     >
+      {isReadOnly && (
+        <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-40">
+           <Lock size={12} className="text-slate-400" />
+           <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">ReadOnly</span>
+        </div>
+      )}
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col min-w-0">
           <h4 className="text-[11px] md:text-[12px] xl:text-[13px] font-black text-slate-800 leading-tight uppercase tracking-tight truncate">
@@ -241,6 +259,24 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
           <span className="text-[9px] font-medium text-blue-500 truncate">{deal.phone || '-'}</span>
         </div>
       </div>
+
+      {/* Custom Fields - Kanban Visible */}
+      {kanbanFields.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 border-t border-slate-50 pt-2">
+          {kanbanFields.map(field => {
+            const val = deal.custom_fields?.[field.name];
+            if (val === undefined || val === null || val === '') return null;
+            return (
+              <div key={field.id} className="flex flex-col">
+                <span className="text-[7px] font-black uppercase text-slate-400 tracking-widest leading-none mb-0.5">{field.label}</span>
+                <span className="text-[9px] font-bold text-slate-600 truncate max-w-[100px]">
+                  {field.type === 'checkbox' ? (val ? 'Sì' : 'No') : val.toString()}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex items-center justify-between pt-2 border-t border-slate-50 mt-auto">
         <div className="flex flex-col xl:flex-row xl:items-center gap-1 xl:gap-2">

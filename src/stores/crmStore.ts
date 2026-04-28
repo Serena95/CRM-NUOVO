@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { CRMStructure, CRMStage, CRMDeal } from '@/types/crm';
+import { CRMStructure, CRMStage, CRMDeal, CRMCustomFieldDefinition, SmartProcess } from '@/types/crm';
 import { supabaseCRMService } from '@/services/supabaseCRMService';
 import { CRM_STRUCTURES, CRM_PIPELINE_STAGES } from '@/constants/crm';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot, Unsubscribe } from 'firebase/firestore';
 
 interface CRMFilters {
   search: string;
@@ -29,15 +29,18 @@ interface CRMState {
   activeStructure: CRMStructure | null;
   stages: CRMStage[];
   deals: CRMDeal[];
+  customFields: CRMCustomFieldDefinition[];
+  smartProcesses: SmartProcess[];
   isLoading: boolean;
   initialLoadDone: boolean;
   error: string | null;
-  subscription: RealtimeChannel | null;
+  unsubscribeFn: Unsubscribe | null;
   
   // Filters
   filters: CRMFilters;
   savedFilters: SavedFilter[];
   activeSavedFilterId: string | null;
+  activeSavedFilterLabel: string | null;
 
   // Global Search
   globalSearchQuery: string;
@@ -50,6 +53,7 @@ interface CRMState {
   setActiveStructure: (structure: CRMStructure) => void;
   setStages: (stages: CRMStage[]) => void;
   setDeals: (deals: CRMDeal[]) => void;
+  setCustomFields: (fields: CRMCustomFieldDefinition[]) => void;
   
   setFilters: (filters: Partial<CRMFilters>) => void;
   setCRMView: (view: 'kanban' | 'list' | 'calendar') => void;
@@ -86,21 +90,24 @@ export const useCRMStore = create<CRMState>((set, get) => ({
   activeStructure: null,
   stages: [],
   deals: [],
+  customFields: [],
+  smartProcesses: [],
   isLoading: false,
   initialLoadDone: false,
   error: null,
-  subscription: null,
+  unsubscribeFn: null,
 
   // Filters state
   filters: DEFAULT_FILTERS,
   savedFilters: [
-    { id: 'miei', label: 'I miei affari', filters: { responsabile: ['user-1'] } }, // Example for Marco
+    { id: 'miei', label: 'I miei affari', filters: { responsabile: ['user-1'] } }, 
     { id: 'richiamare', label: 'Da richiamare', filters: { stage: ['verifica-telefonica'] } },
     { id: 'trattativa', label: 'In trattativa', filters: { stage: ['invio-preventivo'] } },
     { id: 'contratti', label: 'Contratti', filters: { stage: ['contratto'] } },
     { id: 'vinti', label: 'Vinti', filters: { stage: ['affare-vinto'] } },
   ],
   activeSavedFilterId: null,
+  activeSavedFilterLabel: null,
 
   globalSearchQuery: '',
   globalSearchResults: [],
@@ -111,22 +118,25 @@ export const useCRMStore = create<CRMState>((set, get) => ({
   setActiveStructure: (activeStructure) => set({ activeStructure }),
   setStages: (stages) => set({ stages }),
   setDeals: (deals) => set({ deals }),
+  setCustomFields: (customFields) => set({ customFields }),
 
   setFilters: (newFilters) => set((state) => ({ 
     filters: { ...state.filters, ...newFilters },
-    activeSavedFilterId: null 
+    activeSavedFilterId: null,
+    activeSavedFilterLabel: null
   })),
 
   setCRMView: (crmView) => set({ crmView }),
 
-  resetFilters: () => set({ filters: DEFAULT_FILTERS, activeSavedFilterId: null }),
+  resetFilters: () => set({ filters: DEFAULT_FILTERS, activeSavedFilterId: null, activeSavedFilterLabel: null }),
 
   applySavedFilter: (id) => {
     const saved = get().savedFilters.find(f => f.id === id);
     if (saved) {
       set({ 
         filters: { ...DEFAULT_FILTERS, ...saved.filters },
-        activeSavedFilterId: id
+        activeSavedFilterId: id,
+        activeSavedFilterLabel: saved.label
       });
     }
   },
@@ -139,20 +149,21 @@ export const useCRMStore = create<CRMState>((set, get) => ({
     };
     set((state) => ({
       savedFilters: [...state.savedFilters, newFilter],
-      activeSavedFilterId: newFilter.id
+      activeSavedFilterId: newFilter.id,
+      activeSavedFilterLabel: label
     }));
   },
 
   setGlobalSearchQuery: (query) => set({ globalSearchQuery: query }),
 
-  searchGlobal: async (query) => {
-    if (!query || query.length < 2) {
+  searchGlobal: async (queryStr) => {
+    if (!queryStr || queryStr.length < 2) {
       set({ globalSearchResults: [], isGlobalSearching: false });
       return;
     }
     set({ isGlobalSearching: true });
     try {
-      const results = await supabaseCRMService.searchGlobalDeals(query);
+      const results = await supabaseCRMService.searchGlobalDeals(queryStr);
       set({ globalSearchResults: results });
     } catch (e) {
       console.error("Global search error:", e);
@@ -164,7 +175,6 @@ export const useCRMStore = create<CRMState>((set, get) => ({
   getFilteredDeals: () => {
     const { deals, filters, stages } = get();
     return deals.filter(deal => {
-      // Search text
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         const matchesSearch = 
@@ -173,169 +183,105 @@ export const useCRMStore = create<CRMState>((set, get) => ({
           deal.contact?.toLowerCase().includes(searchLower);
         if (!matchesSearch) return false;
       }
-
-      // Responsabile
-      if (filters.responsabile.length > 0 && !filters.responsabile.includes(deal.assigned_to)) {
-        return false;
-      }
-
-      // Stage
-      if (filters.stage.length > 0 && !filters.stage.includes(deal.stage_id)) {
-        return false;
-      }
-
-      // Valore
-      if (deal.value < filters.valore[0] || deal.value > filters.valore[1]) {
-        return false;
-      }
-
-      // Score Preanalisi
+      if (filters.responsabile.length > 0 && !filters.responsabile.includes(deal.assigned_to)) return false;
+      if (filters.stage.length > 0 && !filters.stage.includes(deal.stage_id)) return false;
+      if (deal.value < filters.valore[0] || deal.value > filters.valore[1]) return false;
       if (deal.preanalysis_result) {
         const score = deal.preanalysis_result.score;
-        if (score < filters.scorePreanalisi[0] || score > filters.scorePreanalisi[1]) {
-          return false;
-        }
+        if (score < filters.scorePreanalisi[0] || score > filters.scorePreanalisi[1]) return false;
       }
-
-      // Data Creazione
       if (filters.dataCreazione.from || filters.dataCreazione.to) {
         const created = new Date(deal.created_at);
         if (filters.dataCreazione.from && created < filters.dataCreazione.from) return false;
         if (filters.dataCreazione.to && created > filters.dataCreazione.to) return false;
       }
-
-      // Stato (Vinto/Perso/Attivo)
       if (filters.stato.length > 0) {
         const stage = stages.find(s => s.id === deal.stage_id);
         const dealStatus = stage?.is_won ? 'vinto' : (stage?.is_lost ? 'perso' : 'attivo');
         if (!filters.stato.includes(dealStatus)) return false;
       }
-
-      // Ultima Attività
       if (filters.ultimaAttivita !== 'all') {
         const lastUpdate = new Date(deal.updated_at || deal.created_at);
         const diffDays = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24);
-        
         if (filters.ultimaAttivita === 'today' && diffDays > 1) return false;
         if (filters.ultimaAttivita === 'week' && diffDays > 7) return false;
         if (filters.ultimaAttivita === 'month' && diffDays > 30) return false;
         if (filters.ultimaAttivita === 'inactive' && diffDays < 5) return false;
       }
-
-      // Struttura (slug)
-      if (filters.struttura.length > 0 && !filters.struttura.includes(deal.structure_id)) {
-        // Note: deal.structure_id is usually a UUID, structure slug might be what filters.struttura contains
-        // We'll check if the deal's structure matches any of the selected structure IDs
-        return false;
-      }
-
       return true;
     });
   },
 
   subscribeToChanges: (structureId) => {
-    // Clean up previous subscription
     get().unsubscribeFromChanges();
 
-    const channel = supabase
-      .channel(`crm-deals-${structureId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'crm_deals',
-          filter: `structure_id=eq.${structureId}`
-        },
-        async (payload: any) => {
-          // Granular update instead of full refresh to improve performance
-          const { eventType, new: nextDeal, old: prevDeal } = payload;
-          
-          set((state) => {
-            let nextDeals = [...state.deals];
-            if (eventType === 'INSERT') {
-              nextDeals = [nextDeal as CRMDeal, ...nextDeals];
-            } else if (eventType === 'UPDATE') {
-              nextDeals = nextDeals.map(d => d.id === nextDeal.id ? { ...d, ...nextDeal } : d);
-            } else if (eventType === 'DELETE') {
-              const deletedId = prevDeal?.id || payload.old?.id;
-              if (deletedId) {
-                nextDeals = nextDeals.filter(d => d.id !== deletedId);
-              }
-            }
-            return { deals: nextDeals };
-          });
-        }
-      )
-      .subscribe();
+    const q = query(
+      collection(db, 'crm_deals'), 
+      where('structure_id', '==', structureId)
+    );
 
-    set({ subscription: channel });
+    const unsub = onSnapshot(q, (snapshot) => {
+      const deals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMDeal));
+      set({ deals: deals.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) });
+    });
+
+    set({ unsubscribeFn: unsub });
   },
 
   unsubscribeFromChanges: () => {
-    const { subscription } = get();
-    if (subscription) {
-      supabase.removeChannel(subscription);
-      set({ subscription: null });
+    const { unsubscribeFn } = get();
+    if (unsubscribeFn) {
+      unsubscribeFn();
+      set({ unsubscribeFn: null });
     }
   },
 
   fetchInitialData: async (preferredStructureSlug?: string, force = false) => {
-    // Avoid double loading or unnecessary re-loading
     const { isLoading, initialLoadDone } = get();
     if (isLoading) return;
     if (initialLoadDone && !preferredStructureSlug && !force) return;
     
     set({ isLoading: true, error: null });
     
-    // Safety Timeout for DB connection (5 seconds)
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Database Timeout")), 5000)
-    );
-
     try {
-      // Race between DB fetching and a 5s timeout
-      await Promise.race([
-        (async () => {
-          try {
-            await supabaseCRMService.initializeCRM();
-          } catch (e) { console.warn("Init skipped"); }
+      try {
+        await supabaseCRMService.initializeCRM();
+      } catch (e) { 
+        console.warn("Init skipped or already done"); 
+      }
 
-          const structures = await supabaseCRMService.getStructures();
-          if (structures && structures.length > 0) {
-            // Find preferred structure or use default
-            let activeStruct = structures[0];
-            if (preferredStructureSlug) {
-               const found = structures.find(s => s.slug === preferredStructureSlug || `nexus-${s.slug}` === preferredStructureSlug);
-               if (found) activeStruct = found;
-            }
+      const structures = await supabaseCRMService.getStructures();
+      if (structures && structures.length > 0) {
+        let activeStruct = structures[0];
+        if (preferredStructureSlug) {
+           const found = structures.find(s => s.slug === preferredStructureSlug || `nexus-${s.slug}` === preferredStructureSlug);
+           if (found) activeStruct = found;
+        }
 
-            // Fetch everything before updating state to avoid flickering
-            const [stages, deals] = await Promise.all([
-              supabaseCRMService.getStages(activeStruct.id),
-              supabaseCRMService.getDeals(activeStruct.id)
-            ]);
-            
-            set({ 
-              structures, 
-              activeStructure: activeStruct,
-              stages,
-              deals,
-              initialLoadDone: true
-            });
-            
-            get().subscribeToChanges(activeStruct.id);
-            return true;
-          }
-          throw new Error("No data in DB");
-        })(),
-        timeoutPromise
-      ]);
-
+        const [stages, deals, customFields, smartProcesses] = await Promise.all([
+          supabaseCRMService.getStages(activeStruct.id),
+          supabaseCRMService.getDeals(activeStruct.id),
+          supabaseCRMService.getCustomFieldDefinitions(),
+          supabaseCRMService.getSmartProcesses()
+        ]);
+        
+        set({ 
+          structures, 
+          activeStructure: activeStruct,
+          stages,
+          deals,
+          customFields,
+          smartProcesses,
+          initialLoadDone: true
+        });
+        
+        get().subscribeToChanges(activeStruct.id);
+      } else {
+        throw new Error("No CRM data found");
+      }
     } catch (error: any) {
-      console.warn("CRM Fetch failed or timed out, switching to local mode:", error.message);
+      console.warn("CRM Fetch failed, using fallback:", error.message);
       
-      // FALLBACK: Use Constants
       const fallbackStructures = CRM_STRUCTURES.map(s => ({
         id: `local-${s.slug}`,
         name: s.name,
@@ -344,10 +290,7 @@ export const useCRMStore = create<CRMState>((set, get) => ({
         created_at: new Date().toISOString()
       }));
       
-      set({ structures: fallbackStructures });
       const defaultStruct = fallbackStructures[0];
-      set({ activeStructure: defaultStruct });
-      
       const fallbackStages = CRM_PIPELINE_STAGES.map((s, i) => ({
         id: `local-stage-${i}`,
         structure_id: defaultStruct.id,
@@ -359,25 +302,23 @@ export const useCRMStore = create<CRMState>((set, get) => ({
         created_at: new Date().toISOString()
       }));
       
-      set({ stages: fallbackStages, deals: [], error: null, initialLoadDone: true });
+      set({ 
+        structures: fallbackStructures, 
+        activeStructure: defaultStruct, 
+        stages: fallbackStages, 
+        deals: [], 
+        initialLoadDone: true 
+      });
     } finally {
       set({ isLoading: false });
     }
   },
 
   switchStructure: async (structure) => {
-    // Reset stages and deals immediately to prevent layout flickering from previous structure
-    set({ 
-      isLoading: true, 
-      activeStructure: structure, 
-      stages: [], 
-      deals: [],
-      error: null 
-    });
+    set({ isLoading: true, activeStructure: structure, stages: [], deals: [], error: null });
 
     try {
       if (structure.id.startsWith('local-')) {
-        // Fallback stages for local structures
         const fallbackStages = CRM_PIPELINE_STAGES.map((s, i) => ({
           id: `local-stage-${i}`,
           structure_id: structure.id,
@@ -411,7 +352,6 @@ export const useCRMStore = create<CRMState>((set, get) => ({
     const stages = get().stages;
     const toStage = stages.find(s => s.id === toStageId);
     
-    // Constraint: Stage Preanalysis is automatic only
     if (toStage?.name.toLowerCase().includes('preanalisi')) {
       toast.error("Questa colonna è automatica. Non è possibile spostare affari qui manualmente.");
       return;
@@ -420,7 +360,6 @@ export const useCRMStore = create<CRMState>((set, get) => ({
     const deal = originalDeals.find(d => d.id === dealId);
     if (!deal) return;
 
-    // Optimistic update
     const updatedDeals = originalDeals.map(d => 
       d.id === dealId ? { ...d, stage_id: toStageId } : d
     );
@@ -433,3 +372,4 @@ export const useCRMStore = create<CRMState>((set, get) => ({
     }
   }
 }));
+

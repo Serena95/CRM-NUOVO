@@ -21,22 +21,78 @@ import Login from '@/pages/Login';
 import LandingPage from '@/pages/LandingPage';
 import BusinessModule from '@/pages/BusinessModule';
 import QuoteModule from '@/pages/QuoteModule';
-import NexusIndex from '@/pages/NexusIndex';
+import CommercialDashboard from '@/pages/CommercialDashboard';
+import { ClientPortal } from '@/pages/ClientPortal';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+import { SmartProcessManager } from './components/crm/SmartProcessManager';
+import { SmartCRM } from './pages/SmartCRM';
+import { useCRMStore } from '@/stores/crmStore';
+
 const App: React.FC = () => {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState(() => {
+  const { fetchInitialData } = useCRMStore();
+  
+  // Client Portal Check
+  const urlParams = new URLSearchParams(window.location.search);
+  const portalToken = urlParams.get('portal');
+
+  useEffect(() => {
+    if (user) {
+      fetchInitialData();
+    }
+  }, [user, fetchInitialData]);
+
+  const [activeTab, setActiveTabValue] = useState(() => {
     return localStorage.getItem('nexus_active_tab') || 'dashboard-home';
   });
   const [showLogin, setShowLogin] = useState(false);
+  const [isSmartProcessManagerOpen, setIsSmartProcessManagerOpen] = useState(false);
+
+  // If portal token exists, return Portal directly
+  if (portalToken) {
+    return (
+      <>
+        <ClientPortal token={portalToken} />
+        <Toaster position="top-right" />
+      </>
+    );
+  }
+
+  const setActiveTab = (tab: string) => {
+    if (tab === 'crm-new-process') {
+      setIsSmartProcessManagerOpen(true);
+      return;
+    }
+    setActiveTabValue(tab);
+  };
 
   useEffect(() => {
     localStorage.setItem('nexus_active_tab', activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    const handleOpenDeal = (e: any) => {
+      const { dealId } = e.detail;
+      if (dealId) {
+        // We set the active tab to 'affari' and since CRM will receive it
+        // it should handle showing the specific deal if we pass it via some state or global store
+        // For now, switching to 'affari' is a good step. 
+        // A better way would be using a store to track the "selectedDealId".
+        setActiveTab('affari');
+        // Small delay to ensure the CRM page is mounted
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('crm:showDeal', { detail: { dealId } }));
+        }, 100);
+      }
+    };
+
+    window.addEventListener('crm:openDealGlobal', handleOpenDeal);
+    return () => window.removeEventListener('crm:openDealGlobal', handleOpenDeal);
+  }, []);
 
   if (loading) {
     return (
@@ -74,6 +130,8 @@ const App: React.FC = () => {
       case 'dashboard-recent':
       case 'dashboard-pipeline':
         return <Dashboard activeTab={activeTab} />;
+      case 'crm-dashboard':
+        return <CommercialDashboard setActiveTab={setActiveTab} />;
       case 'leads':
       case 'affari':
       case 'deals': // backward compatibility
@@ -154,8 +212,13 @@ const App: React.FC = () => {
       case 'settings-users':
       case 'settings-roles':
       case 'settings-permissions':
-        return <Settings />;
+      case 'settings-crm-fields':
+        return <Settings activeTab={activeTab} />;
       default:
+        if (activeTab.startsWith('smart-process-')) {
+          const slug = activeTab.replace('smart-process-', '');
+          return <SmartCRM activeTab={activeTab} setActiveTab={setActiveTab} slug={slug} />;
+        }
         if (activeTab.startsWith('pipeline-') || activeTab.startsWith('nexus-')) {
           return <CRM activeTab={activeTab} setActiveTab={setActiveTab} />;
         }
@@ -164,10 +227,10 @@ const App: React.FC = () => {
             <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 mb-6">
               <Plus size={40} className="rotate-45" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-800">Modulo in Sviluppo</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Sezione in Sviluppo</h2>
             <p className="text-slate-500 max-w-md mt-2">
               Stiamo lavorando per portare tutte le funzionalità necessarie su questa piattaforma. 
-              Il modulo <span className="font-bold text-blue-500 uppercase">"{activeTab}"</span> sarà disponibile a breve.
+              La sezione <span className="font-bold text-blue-500 uppercase">"{activeTab}"</span> sarà disponibile a breve.
             </p>
             <Button 
               onClick={() => setActiveTab('feed')}
@@ -185,6 +248,14 @@ const App: React.FC = () => {
       <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
         {renderContent()}
       </Layout>
+      {isSmartProcessManagerOpen && (
+        <SmartProcessManager 
+          onClose={() => setIsSmartProcessManagerOpen(false)}
+          onProcessCreated={(p) => {
+            setActiveTab(`smart-process-${p.slug}`);
+          }}
+        />
+      )}
       <Toaster position="top-right" />
     </TooltipProvider>
   );

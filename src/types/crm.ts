@@ -14,13 +14,103 @@ export interface CRMStage {
   is_won: boolean;
   is_lost: boolean;
   color?: string;
+  has_automations?: boolean;
 }
+
+export type CRMAutomationType = 'task' | 'email' | 'assignee' | 'note' | 'webhook' | 'notification' | 'timer' | 'whatsapp';
+
+export type CRMCustomFieldType = 
+  | 'text' 
+  | 'number' 
+  | 'select' 
+  | 'multi_select' 
+  | 'date' 
+  | 'checkbox' 
+  | 'url' 
+  | 'email' 
+  | 'phone' 
+  | 'currency' 
+  | 'textarea';
+
+export interface SmartProcess {
+  id: string;
+  tenant_id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  created_at: string;
+}
+
+export interface SmartRecord {
+  id: string;
+  process_id: string;
+  stage_id: string;
+  title: string;
+  content: string;
+  value: number;
+  assigned_to?: string;
+  contact_id?: string;
+  company_id?: string;
+  custom_fields: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SmartFieldDefinition {
+  id: string;
+  process_id: string;
+  name: string;
+  label: string;
+  type: CRMCustomFieldType;
+  options?: string[];
+  required: boolean;
+  show_in_kanban: boolean;
+  order: number;
+}
+
+export interface CRMCustomFieldDefinition {
+  id: string;
+  tenant_id: string;
+  entity_type: 'deal' | 'contact' | 'company' | 'lead';
+  name: string;
+  label: string;
+  type: CRMCustomFieldType;
+  options?: string[]; // For select/multi_select
+  required: boolean;
+  show_in_kanban: boolean;
+  show_in_list: boolean;
+  order: number;
+  created_at: string;
+}
+
+export interface CRMAutomation {
+  id: string;
+  stage_id: string;
+  type: CRMAutomationType;
+  config: {
+    title?: string;
+    description?: string;
+    recipient?: string;
+    subject?: string;
+    body?: string;
+    assignee_id?: string;
+    url?: string;
+    delay_minutes?: number;
+    message?: string;
+  };
+  is_active: boolean;
+  created_at: string;
+}
+
+import { UserRole } from './index';
 
 export interface CRMUser {
   id: string;
   name: string;
   email: string;
-  role: 'commerciale' | 'consulente' | 'admin' | 'support';
+  role: UserRole;
   avatar?: string;
   team?: string;
 }
@@ -76,4 +166,155 @@ export interface CRMFormResult {
   score: number;
   result: string;
   created_at: string;
+}
+
+export type WhatsAppMessageStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+
+export interface WhatsAppMessage {
+  id: string;
+  deal_id: string;
+  sender_id: string;
+  sender_name: string;
+  recipient_phone: string;
+  content: string;
+  type: 'text' | 'image' | 'video' | 'document' | 'template';
+  file_url?: string;
+  file_name?: string;
+  status: WhatsAppMessageStatus;
+  template_id?: string;
+  created_at: string;
+  delivered_at?: string;
+  read_at?: string;
+  error?: string;
+  direction: 'inbound' | 'outbound';
+}
+
+export interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  category: string;
+  language: string;
+  body: string;
+  header?: string;
+  footer?: string;
+  components?: any[];
+  status: 'approved' | 'pending' | 'rejected';
+  created_at: string;
+}
+
+export type CalendarEventType = 'call' | 'meeting' | 'task' | 'followup' | 'deadline';
+
+export interface CRMCalendarEvent {
+  id: string;
+  title: string;
+  type: CalendarEventType;
+  start_date: string;
+  end_date: string;
+  deal_id?: string;
+  deal_title?: string;
+  assigned_to: string;
+  assigned_to_name?: string;
+  description?: string;
+  location?: string;
+  is_all_day?: boolean;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  sync_id?: string;
+  sync_provider?: 'google' | 'outlook';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CRMFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+  path: string;
+  related_to_id: string;
+  related_to_type: 'deal' | 'contact' | 'company';
+  uploaded_by: string;
+  uploaded_by_name?: string;
+  created_at: string;
+  category?: 'contract' | 'quote' | 'invoice' | 'document' | 'other';
+}
+
+export interface ClientPortalAccess {
+  id: string;
+  deal_id: string;
+  token: string;
+  expires_at: string;
+  created_at: string;
+}
+
+export type SignatureStatus = 'draft' | 'sent' | 'signed' | 'rejected';
+export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'rejected';
+
+export interface CRMProduct {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  description?: string;
+  created_at: string;
+}
+
+export interface QuoteItem {
+  id: string;
+  name: string;
+  description?: string;
+  quantity: number;
+  price: number;
+  tax_rate: number;
+  total: number;
+}
+
+export interface CRMQuote {
+  id: string;
+  deal_id: string;
+  title: string;
+  items: QuoteItem[];
+  subtotal: number;
+  tax_amount: number;
+  total_amount: number;
+  status: QuoteStatus;
+  valid_until?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+export interface CRMSignature {
+  id: string;
+  deal_id: string;
+  document_name: string;
+  document_url: string;
+  status: SignatureStatus;
+  requested_at: string;
+  signed_at?: string;
+  signature_data_url?: string; // Base64 of the signature
+  client_email?: string;
+  client_name?: string;
+}
+
+export type TaskStatus = 'todo' | 'in_progress' | 'completed' | 'blocked';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface CRMTask {
+  id: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date?: string;
+  assigned_to: string;
+  assigned_to_name?: string;
+  related_to_id: string; // Deal, Contact, or Company ID
+  related_to_type: 'deal' | 'contact' | 'company';
+  related_to_name?: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  completed_at?: string;
 }

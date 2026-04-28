@@ -23,8 +23,9 @@ const FeedList: React.FC<{ entityType?: string, entityId?: string }> = ({ entity
     });
 
     return () => {
-      if (unsub instanceof Function) unsub();
-      else if (unsub && 'unsubscribe' in unsub) unsub.unsubscribe();
+      if (typeof unsub === 'function') {
+        unsub();
+      }
     };
   }, [tenant]);
 

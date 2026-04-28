@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Building, User, CreditCard, LogOut, Users } from 'lucide-react';
+import { Shield, Building, User, CreditCard, LogOut, Users, Settings2 } from 'lucide-react';
+import { CustomFieldsSettings } from '@/components/crm/settings/CustomFieldsSettings';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { collection, query, onSnapshot } from 'firebase/firestore';
@@ -14,9 +15,27 @@ import { db } from '@/lib/firebase';
 import { UserProfile } from '@/types';
 import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
 
-const Settings: React.FC = () => {
+interface SettingsProps {
+  activeTab?: string;
+}
+
+const Settings: React.FC<SettingsProps> = ({ activeTab: externalActiveTab }) => {
   const { profile, tenant, logout } = useAuth();
   const [activeSection, setActiveSection] = React.useState('profile');
+
+  React.useEffect(() => {
+    if (externalActiveTab) {
+      if (externalActiveTab === 'settings') setActiveSection('profile');
+      else {
+        const section = externalActiveTab.split('-')[1];
+        if (section === 'crm' && externalActiveTab.split('-')[2] === 'fields') {
+          setActiveSection('crm-fields');
+        } else {
+          setActiveSection(section || 'profile');
+        }
+      }
+    }
+  }, [externalActiveTab]);
   const [workspaceUsers, setWorkspaceUsers] = React.useState<UserProfile[]>([]);
 
   React.useEffect(() => {
@@ -32,6 +51,7 @@ const Settings: React.FC = () => {
     { id: 'profile', label: 'Mio Profilo', icon: User },
     { id: 'workspace', label: 'Workspace', icon: Building },
     { id: 'users', label: 'Gestione Utenti', icon: Users },
+    { id: 'crm-fields', label: 'Campi CRM', icon: Settings2 },
     { id: 'security', label: 'Sicurezza', icon: Shield },
   ];
 
@@ -201,6 +221,12 @@ const Settings: React.FC = () => {
                     </tbody>
                   </table>
                 </CardContent>
+              </Card>
+            )}
+
+            {activeSection === 'crm-fields' && (
+              <Card className="border-none shadow-sm rounded-2xl overflow-hidden bg-white">
+                <CustomFieldsSettings />
               </Card>
             )}
           </div>

@@ -13,7 +13,15 @@ import {
   BarChart3,
   Clock,
   Pin,
-  Paperclip
+  Paperclip,
+  TrendingUp,
+  DollarSign,
+  User as UserIcon,
+  Building,
+  Target,
+  FileText as FileIcon,
+  StickyNote,
+  X
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -121,11 +129,86 @@ export const FeedPost: React.FC<FeedPostProps> = ({ post }) => {
             </div>
           </div>
         );
+      case 'crm_activity':
+        const crmType = post.metadata?.crm_activity_type;
+        const dealTitle = post.metadata?.deal_title;
+        const dealId = post.entity_id;
+        
+        const openDeal = () => {
+          if (dealId) {
+            window.dispatchEvent(new CustomEvent('crm:openDealGlobal', { 
+              detail: { dealId } 
+            }));
+          }
+        };
+
+        const getCrmBg = () => {
+          switch (crmType) {
+            case 'deal_won': return 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100/50';
+            case 'deal_lost': return 'bg-rose-50 border-rose-100 hover:bg-rose-100/50';
+            case 'deal_created': return 'bg-blue-50/50 border-blue-100 hover:bg-blue-50';
+            default: return 'bg-slate-50/50 border-slate-100 hover:bg-slate-50';
+          }
+        };
+
+        const getCrmIcon = () => {
+          switch (crmType) {
+            case 'deal_created': return <DollarSign className="text-blue-500" />;
+            case 'deal_won': return <TrendingUp className="text-emerald-600" />;
+            case 'deal_lost': return <X size={20} className="text-rose-600" />;
+            case 'stage_change': return <Target className="text-blue-500" />;
+            case 'comment': return <MessageSquare className="text-slate-500" />;
+            case 'task': return <CheckSquare className="text-purple-500" />;
+            case 'note': return <StickyNote className="text-amber-500" />;
+            case 'file': return <FileIcon className="text-blue-400" />;
+            default: return <TrendingUp className="text-slate-400" />;
+          }
+        };
+
+        return (
+          <div className="space-y-3">
+             <div className={cn("rounded-2xl p-5 border group/crm cursor-pointer transition-all", getCrmBg())} onClick={openDeal}>
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center shadow-sm group-hover/crm:scale-110 transition-transform">
+                    {getCrmIcon()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className="font-black text-slate-800 text-[13px] uppercase tracking-tight flex items-center gap-2">
+                        {crmType === 'deal_created' && "Nuovo Affare"}
+                        {crmType === 'deal_won' && <span className="text-emerald-600">Affare Vinto 🏆</span>}
+                        {crmType === 'deal_lost' && <span className="text-rose-600">Affare Perso ❌</span>}
+                        {crmType === 'stage_change' && "Cambio Stage"}
+                        {crmType === 'comment' && "Nuovo Commento"}
+                        {crmType === 'task' && "Nuovo Task"}
+                        {crmType === 'note' && "Nuova Nota"}
+                        {crmType === 'file' && "Nuovo Allegato"}
+                        <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                        <span className="text-blue-600 hover:underline">{dealTitle}</span>
+                      </h4>
+                    </div>
+                    <div 
+                      className="mt-2 text-sm text-slate-700 font-medium leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: post.content_html || post.content }}
+                    />
+                    {post.metadata?.new_stage_name && (
+                      <div className="mt-3 flex items-center gap-2">
+                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aggiornato a:</span>
+                         <Badge variant="secondary" className="bg-white text-blue-600 border-blue-100 font-black text-[10px] px-3 py-0.5">
+                           {post.metadata.new_stage_name}
+                         </Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+             </div>
+          </div>
+        );
       default:
         return (
           <div 
             className="text-slate-700 text-[15px] leading-relaxed tiptap-content"
-            dangerouslySetInnerHTML={{ __html: post.content_html }} 
+            dangerouslySetInnerHTML={{ __html: post.content_html || post.content }} 
           />
         );
     }

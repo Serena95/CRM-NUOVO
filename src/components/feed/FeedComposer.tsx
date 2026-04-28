@@ -17,6 +17,7 @@ import { MessageComposer } from './composers/MessageComposer';
 import { TaskComposer } from './composers/TaskComposer';
 import { EventComposer } from './composers/EventComposer';
 import { PollComposer } from './composers/PollComposer';
+import { FileComposer } from './composers/FileComposer';
 
 type FeedTab = 'message' | 'task' | 'event' | 'poll' | 'file' | 'other';
 
@@ -67,11 +68,17 @@ export const FeedComposer: React.FC = () => {
           </div>
           
           <div className="flex-1">
-            {activeTab === 'message' && <MessageComposer onCancel={() => setIsExpanded(false)} />}
+            {activeTab === 'message' && (
+              <MessageComposer 
+                onCancel={() => setIsExpanded(false)} 
+                onSwitchTab={(tab) => setActiveTab(tab as FeedTab)}
+              />
+            )}
             {activeTab === 'task' && <TaskComposer onCancel={() => setIsExpanded(false)} />}
             {activeTab === 'event' && <EventComposer onCancel={() => setIsExpanded(false)} />}
             {activeTab === 'poll' && <PollComposer onCancel={() => setIsExpanded(false)} />}
-            {(activeTab === 'file' || activeTab === 'other') && (
+            {activeTab === 'file' && <FileComposer onCancel={() => setIsExpanded(false)} />}
+            {activeTab === 'other' && (
               <div className="p-8 text-center text-slate-400 italic text-sm">
                 Funzionalità {activeTab} in arrivo...
               </div>

@@ -1,6 +1,6 @@
 {
   "name": "Nexus Business CRM",
-  "description": "Un CRM avanzato in stile Bitrix24 con pipeline multiple (Finanza Agevolata, Servizi Digitali, ecc.), Kanban board dinamica e automazioni basate su AI per la preanalisi dei lead.",
+  "description": "Un CRM enterprise con pipeline multiple, Kanban board, sistema di gestione Task completo, Calendario integrato, Documenti con Storage, Firma Elettronica nativa e Sistema Preventivi con listino prodotti.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

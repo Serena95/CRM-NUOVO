@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { 
+  Building, 
+  UserPlus, 
+  DollarSign, 
+  Ticket, 
+  ClipboardList, 
+  Shield,
   LayoutDashboard, 
   Users, 
   Briefcase, 
@@ -24,6 +29,7 @@ import {
   Mail,
   Target,
   Zap,
+  Settings2,
   TrendingUp,
   Grid,
   MoreHorizontal,
@@ -61,14 +67,12 @@ import {
   User,
   Folder,
   FolderPlus,
-  DollarSign,
-  Building,
   GitBranch,
-  UserPlus,
   Sparkles,
   Compass,
   PlusCircle
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import ChatAgente from './crm/ChatAgente';
 import NotificationCenter from './NotificationCenter';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -92,17 +96,32 @@ import {
 import { cn } from '@/lib/utils';
 import { GlobalSearch } from './crm/GlobalSearch';
 
+const ICONS = [
+  { name: 'DollarSign', icon: DollarSign },
+  { name: 'Briefcase', icon: Briefcase },
+  { name: 'Ticket', icon: Ticket },
+  { name: 'ClipboardList', icon: ClipboardList },
+  { name: 'MessageSquare', icon: MessageSquare },
+  { name: 'Shield', icon: Shield },
+  { name: 'Workflow', icon: Workflow },
+];
+
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
 
+import { useCRMPermissions } from '@/hooks/useCRMPermissions';
+import { useCRMStore } from '@/stores/crmStore';
+
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
   const { profile, tenant, logout } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['crm', 'tasks']);
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
+  const { role } = useCRMPermissions();
+  const { smartProcesses } = useCRMStore();
 
   const toggleMenu = (id: string) => {
     setExpandedMenus(prev => 
@@ -210,13 +229,29 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
   }, []);
 
   const navItems = [
+    { id: 'crm', label: 'CRM', icon: Briefcase, subItems: [
+      { id: 'crm-dashboard', label: 'Dashboard commerciale', icon: LayoutDashboard },
+      { id: 'feed', label: 'Feed attività', icon: Activity },
+      { id: 'leads', label: 'Lead', icon: UserPlus },
+      { id: 'contacts', label: 'Contatti', icon: Users },
+      { id: 'companies', label: 'Aziende', icon: Building },
+      { id: 'affari', label: 'Affari', icon: DollarSign },
+      ...smartProcesses.map(p => {
+        const IconComp = ICONS.find(i => i.name === p.icon)?.icon || DollarSign;
+        return {
+          id: `smart-process-${p.slug}`,
+          label: p.name,
+          icon: IconComp
+        };
+      }),
+      { id: 'crm-new-process', label: '+ Nuovo processo', icon: Plus, className: "text-blue-500 font-black mt-2" },
+    ]},
     { id: 'dashboard', label: 'Monitoraggio CRM', icon: Home, subItems: [
       { id: 'dashboard-home', label: 'Home dashboard', icon: LayoutDashboard },
       { id: 'dashboard-kpi', label: 'KPI', icon: BarChart3 },
       { id: 'dashboard-recent', label: 'Attività recenti', icon: Activity },
       { id: 'dashboard-pipeline', label: 'Pipeline overview', icon: PieChart },
-    ]},
-    { id: 'feed', label: 'Feed Attività', icon: Sparkles },
+    ], roles: ['admin', 'manager', 'viewer'] },
     { id: 'chat', label: 'Chat e chiamate', icon: MessageSquare, subItems: [
       { id: 'chat-private', label: 'Chat privata', icon: MessageSquare },
       { id: 'chat-group', label: 'Chat gruppo', icon: Users2 },
@@ -248,14 +283,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       { id: 'groups-list', label: 'Gruppi', icon: Users },
       { id: 'groups-projects', label: 'Progetti', icon: Briefcase },
     ]},
-    { id: 'crm', label: 'CRM', icon: Briefcase, subItems: [
-      { id: 'leads', label: 'Lead', icon: UserPlus },
-      { id: 'affari', label: 'Affari', icon: DollarSign },
-      { id: 'contacts', label: 'Contatti', icon: Users },
-      { id: 'companies', label: 'Aziende', icon: Building },
-      { id: 'preventivi', label: 'Preventivi', icon: FileEdit },
-      { id: 'activities', label: 'Attività', icon: Activity },
-    ]},
     { id: 'tasks', label: 'Task e progetti', icon: CheckSquare, subItems: [
       { id: 'tasks-my', label: 'I miei task', icon: CheckSquare },
       { id: 'tasks-all', label: 'Tutti i task', icon: Layers },
@@ -267,32 +294,38 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       { id: 'marketing-sms', label: 'SMS marketing', icon: Smartphone },
       { id: 'marketing-campaigns', label: 'Campagne', icon: Megaphone },
       { id: 'marketing-leads', label: 'Lead generation', icon: UserPlus },
-    ]},
+    ], roles: ['admin', 'manager', 'commerciale'] },
     { id: 'automation', label: 'Automazione', icon: Zap, subItems: [
       { id: 'automation-workflow', label: 'Workflow builder', icon: Workflow },
       { id: 'automation-triggers', label: 'Trigger', icon: Zap },
       { id: 'automation-robots', label: 'Robot', icon: Bot },
-    ]},
+    ], roles: ['admin'] },
     { id: 'analytics', label: 'Analisi', icon: TrendingUp, subItems: [
       { id: 'analytics-dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'analytics-sales', label: 'Vendite', icon: DollarSign },
       { id: 'analytics-pipeline', label: 'Pipeline', icon: GitBranch },
-    ]},
+    ], roles: ['admin', 'manager'] },
     { id: 'contact-center', label: 'Contact center', icon: Headphones, subItems: [
       { id: 'cc-livechat', label: 'Live chat', icon: MessageSquare },
       { id: 'cc-whatsapp', label: 'WhatsApp', icon: MessageSquare },
       { id: 'cc-telegram', label: 'Telegram', icon: Send },
-    ]},
+    ], roles: ['admin', 'manager', 'commerciale'] },
     { id: 'apps', label: 'Applicazioni', icon: Grid, subItems: [
       { id: 'apps-marketplace', label: 'Marketplace app', icon: Store },
       { id: 'apps-integrations', label: 'Integrazioni', icon: Layers },
-    ]},
+    ], roles: ['admin'] },
     { id: 'settings', label: 'Impostazioni', icon: Settings, subItems: [
       { id: 'settings-users', label: 'Utenti', icon: Users },
       { id: 'settings-roles', label: 'Ruoli', icon: ShieldCheck },
       { id: 'settings-permissions', label: 'Permessi', icon: ShieldCheck },
-    ]},
+      { id: 'settings-crm-fields', label: 'Campi CRM', icon: Settings2 },
+    ], roles: ['admin'] },
   ];
+
+  const filteredNavItems = navItems.filter(item => {
+    if (!item.roles) return true;
+    return item.roles.includes(role || 'viewer');
+  });
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full nexus-sidebar-gradient text-white/70">
@@ -312,7 +345,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       </div>
 
       <nav className="flex-1 px-4 space-y-0.5 overflow-y-auto nexus-scrollbar py-4">
-        {navItems.map((item) => (
+        {filteredNavItems.map((item) => (
           <div key={item.id} className="mb-1">
             <button
               onClick={() => {

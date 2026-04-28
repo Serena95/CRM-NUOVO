@@ -82,6 +82,123 @@ service cloud.firestore {
       allow delete: if (isOwner(existing().userId) || isAdmin());
     }
 
+    // --- CRM Logic (Nexus) ---
+    match /crm_structures/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /crm_stages/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /crm_deals/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+    match /crm_activities/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+    match /crm_automations/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /crm_field_definitions/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /crm_form_results/{id} {
+      allow read: if isSignedIn();
+      allow create: if true; // Public submissions
+    }
+    
+    // --- Smart Processes ---
+    match /smart_processes/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /smart_records/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+    match /smart_fields/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /whatsapp_messages/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+    match /whatsapp_templates/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /calendar_events/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.assigned_to == request.auth.uid);
+    }
+    match /crm_tasks/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.assigned_to == request.auth.uid);
+    }
+    match /crm_files/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.uploaded_by == request.auth.uid);
+    }
+    match /crm_signatures/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+    match /crm_products/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /crm_quotes/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+    match /crm_portal_access/{id} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // --- Activity Feed ---
+    match /feed_posts/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.author_id == request.auth.uid);
+    }
+    match /feed_comments/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.author_id == request.auth.uid;
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.author_id == request.auth.uid);
+    }
+    match /feed_reactions/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.user_id == request.auth.uid;
+    }
+
     // --- CRM Notifications ---
     function isValidCRMNotification(data) {
       return data.keys().hasAll(['userId', 'type', 'title', 'description', 'dealId', 'dealTitle', 'read', 'createdAt', 'createdBy']) &&

@@ -355,6 +355,115 @@
       },
       "required": ["id", "tenantId", "cliente_nome", "items", "totale_complessivo"]
     },
+    "WhatsAppTemplate": {
+      "title": "WhatsAppTemplate",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "language": { "type": "string" },
+        "body": { "type": "string" },
+        "status": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CRMCalendarEvent": {
+      "title": "CRMCalendarEvent",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["call", "meeting", "task", "followup", "deadline"] },
+        "start_date": { "type": "string", "format": "date-time" },
+        "end_date": { "type": "string", "format": "date-time" },
+        "deal_id": { "type": "string" },
+        "assigned_to": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["scheduled", "completed", "cancelled"] }
+      }
+    },
+    "CRMTask": {
+      "title": "CRMTask",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["todo", "in_progress", "completed", "blocked"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"] },
+        "due_date": { "type": "string", "format": "date-time" },
+        "assigned_to": { "type": "string" },
+        "related_to_id": { "type": "string" },
+        "related_to_type": { "type": "string", "enum": ["deal", "contact", "company"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CRMFile": {
+      "title": "CRMFile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "size": { "type": "number" },
+        "type": { "type": "string" },
+        "url": { "type": "string" },
+        "path": { "type": "string" },
+        "related_to_id": { "type": "string" },
+        "related_to_type": { "type": "string", "enum": ["deal", "contact", "company"] },
+        "uploaded_by": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "category": { "type": "string", "enum": ["contract", "quote", "invoice", "document", "other"] }
+      }
+    },
+    "CRMProduct": {
+      "title": "CRMProduct",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CRMQuote": {
+      "title": "CRMQuote",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "deal_id": { "type": "string" },
+        "title": { "type": "string" },
+        "total_amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["draft", "sent", "accepted", "rejected"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ClientPortalAccess": {
+      "title": "ClientPortalAccess",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "deal_id": { "type": "string" },
+        "token": { "type": "string" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CRMSignature": {
+      "title": "CRMSignature",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "deal_id": { "type": "string" },
+        "document_name": { "type": "string" },
+        "document_url": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "sent", "signed", "rejected"] },
+        "requested_at": { "type": "string", "format": "date-time" },
+        "signed_at": { "type": "string", "format": "date-time" }
+      }
+    },
     "SocialUser": {
       "title": "SocialUser",
       "type": "object",
@@ -511,9 +620,126 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "type", "title", "description", "dealId", "dealTitle", "userId", "read", "createdAt", "createdBy"]
+    },
+    "SmartProcess": {
+      "title": "SmartProcess",
+      "description": "A customizable workflow process.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" },
+        "color": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "slug"]
+    },
+    "SmartRecord": {
+      "title": "SmartRecord",
+      "description": "A record within a smart process.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "process_id": { "type": "string" },
+        "data": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "process_id", "data"]
+    },
+    "SmartFieldDefinition": {
+      "title": "SmartFieldDefinition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "process_id": { "type": "string" },
+        "label": { "type": "string" },
+        "type": { "type": "string", "enum": ["text", "number", "date", "textarea", "checkbox"] },
+        "required": { "type": "boolean" },
+        "order": { "type": "number" }
+      },
+      "required": ["id", "process_id", "label", "type"]
     }
   },
   "firestore": {
+    "/crm_structures/{id}": {
+      "schema": "object",
+      "description": "CRM Pipeline structures."
+    },
+    "/crm_stages/{id}": {
+      "schema": "object",
+      "description": "CRM Stages."
+    },
+    "/crm_deals/{id}": {
+      "schema": "object",
+      "description": "CRM Deals."
+    },
+    "/crm_activities/{id}": {
+      "schema": "object",
+      "description": "CRM Activities."
+    },
+    "/crm_automations/{id}": {
+      "schema": "object",
+      "description": "CRM Automations."
+    },
+    "/crm_field_definitions/{id}": {
+      "schema": "object",
+      "description": "Custom field definitions."
+    },
+    "/crm_form_results/{id}": {
+      "schema": "object",
+      "description": "External form submissions."
+    },
+    "/smart_processes/{id}": {
+      "schema": "SmartProcess",
+      "description": "Smart process definitions."
+    },
+    "/smart_records/{id}": {
+      "schema": "SmartRecord",
+      "description": "Smart process records."
+    },
+    "/smart_fields/{id}": {
+      "schema": "SmartFieldDefinition",
+      "description": "Custom fields for smart processes."
+    },
+    "/whatsapp_messages/{id}": {
+      "schema": "WhatsAppMessage",
+      "description": "WhatsApp chat messages."
+    },
+    "/whatsapp_templates/{id}": {
+      "schema": "WhatsAppTemplate",
+      "description": "Approved WhatsApp templates."
+    },
+    "/calendar_events/{id}": {
+      "schema": "CRMCalendarEvent",
+      "description": "CRM Calendar events and meetings."
+    },
+    "/crm_tasks/{id}": {
+      "schema": "CRMTask",
+      "description": "CRM Tasks management."
+    },
+    "/crm_files/{id}": {
+      "schema": "CRMFile",
+      "description": "CRM File metadata storage."
+    },
+    "/crm_signatures/{id}": {
+      "schema": "CRMSignature",
+      "description": "Electronic signature requests and status."
+    },
+    "/crm_products/{id}": {
+      "schema": "CRMProduct",
+      "description": "CRM Product catalog."
+    },
+    "/crm_quotes/{id}": {
+      "schema": "CRMQuote",
+      "description": "CRM Quotations for deals."
+    },
+    "/crm_portal_access/{id}": {
+      "schema": "ClientPortalAccess",
+      "description": "Tokens for client portal access."
+    },
     "/notifications/{notifId}": {
       "schema": "CRMNotification",
       "description": "Real-time CRM notifications."

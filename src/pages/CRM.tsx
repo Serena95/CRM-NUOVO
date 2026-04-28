@@ -4,7 +4,8 @@ import { supabaseCRMService } from '@/services/supabaseCRMService';
 import { CRMStructuresSelector } from '@/components/crm/CRMStructuresSelector';
 import { KanbanBoard } from '@/components/crm/Kanban/KanbanBoard';
 import { DealList } from '@/components/crm/DealList';
-import { DealCalendar } from '@/components/crm/DealCalendar';
+import { CRMCalendar } from '@/components/crm/CRMCalendar';
+import { TaskKanban } from '@/components/crm/TaskKanban';
 import { toast } from 'sonner';
 import { 
   BarChart3, 
@@ -15,6 +16,7 @@ import {
   Users2,
   Building,
   Target,
+  CheckSquare,
   Zap,
   Download,
   MoreHorizontal,
@@ -37,6 +39,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CreateItemModal } from '@/components/crm/CreateItemModal';
 import { AdvancedFilters } from '@/components/crm/AdvancedFilters';
 import { DetailDrawer } from '@/components/crm/DetailDrawer';
+import { CRMHeaderKPIs } from '@/components/crm/CRMHeaderKPIs';
 
 const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }> = ({ activeTab: propActiveTab, setActiveTab }) => {
   const { 
@@ -131,6 +134,8 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
     { id: 'affari', label: 'Affari', icon: Target },
     { id: 'contatti', label: 'Contatti', icon: Users2 },
     { id: 'aziende', label: 'Aziende', icon: Building },
+    { id: 'tasks', label: 'Task', icon: CheckSquare },
+    { id: 'calendario', label: 'Calendario', icon: CalendarIcon },
     { id: 'analytics', label: 'Analisi', icon: BarChart3 },
     { id: 'automazioni', label: 'Automazioni', icon: Zap },
     { id: 'configurazione', label: 'Configurazione', icon: Settings },
@@ -266,11 +271,11 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
         </div>
       </div>
 
-      {/* Main CRM Workspace */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Interaction Bar (Bitrix Style) - Sticky on mobile */}
-        <div className="px-4 md:px-6 py-2.5 md:py-3 bg-[#eef2f7] border-b border-slate-200 flex items-center justify-between shrink-0 sticky top-[57px] md:relative z-20">
-          <div className="flex items-center gap-3 md:gap-4 overflow-x-auto no-scrollbar flex-1 mr-2">
+      {/* Main CRM Workspace - PAGINA AFFARI */}
+      <div className="flex flex-col h-full overflow-hidden relative bg-[#f8fafc]">
+        {/* Interaction Bar (Bitrix Style) - Lower Z-INDEX, but higher than the Kanban content to remain visible while scrolling if needed, yet under drawers */}
+        <div className="px-4 md:px-6 py-2.5 md:py-3 bg-[#eef2f7] border-b border-slate-200 flex items-center justify-between shrink-0 relative z-[5]">
+          <div className="flex items-center gap-3 md:gap-4 overflow-x-auto no-scrollbar flex-1 mr-2 px-0.5">
             <Button 
               variant="ghost" 
               size="sm" 
@@ -372,6 +377,9 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
             </Button>
           </div>
         </div>
+        
+        {/* KPI Header Section */}
+        {activeViewTab === 'affari' && <CRMHeaderKPIs />}
 
         {/* Kanban Area */}
         <div className="flex-1 overflow-hidden flex flex-col relative">
@@ -421,12 +429,31 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="h-full flex flex-col"
+                  className="h-full flex flex-col p-4 md:p-6"
                 >
-                  <DealCalendar />
+                  <CRMCalendar deals={useCRMStore.getState().getFilteredDeals()} />
                 </motion.div>
               )}
             </AnimatePresence>
+          ) : activeViewTab === 'calendario' ? (
+            <motion.div
+              key="main-calendar"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="h-full flex flex-col p-4 md:p-6"
+            >
+              <CRMCalendar deals={useCRMStore.getState().getFilteredDeals()} />
+            </motion.div>
+          ) : activeViewTab === 'tasks' ? (
+            <motion.div
+              key="task-kanban"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="h-full flex flex-col p-4 md:p-6"
+            >
+              <TaskKanban deals={useCRMStore.getState().getFilteredDeals()} />
+            </motion.div>
           ) : (
             <motion.div 
               key="fallback"
@@ -437,7 +464,7 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
               <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-blue-300 mb-6">
                 <Plus size={40} className="rotate-45" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">Modulo in fase di sviluppo</h2>
+              <h2 className="text-2xl font-bold text-slate-800 uppercase tracking-tight">Sezione in fase di sviluppo</h2>
               <p className="text-slate-500 max-w-md mt-2 font-medium">
                 Siamo attualmente impegnati nell'implementazione di questa sezione per offrirti un'esperienza CRM completa in stile Bitrix24.
               </p>

@@ -49,7 +49,7 @@ export const CRMStructuresSelector: React.FC<{ onSelect?: () => void }> = ({ onS
   const Trigger = () => (
     <button 
       onClick={() => setIsOpen(true)}
-      className="flex items-center gap-3 text-[14px] font-bold text-blue-600 hover:text-blue-700 transition-all uppercase tracking-tight outline-none h-10 px-5 rounded-full bg-blue-50/50 border border-blue-100 hover:border-blue-200 group whitespace-nowrap"
+      className="flex items-center gap-3 text-[14px] font-bold text-blue-600 hover:text-blue-700 transition-all uppercase tracking-tight outline-none h-10 px-5 rounded-full bg-blue-50 border border-blue-100 hover:border-blue-200 group whitespace-nowrap"
     >
       <LayoutGrid size={16} className="text-blue-500" />
       <span className="truncate max-w-[120px] md:max-w-none">{activeStructure?.name || 'Scegli Pipeline'}</span>
@@ -62,26 +62,26 @@ export const CRMStructuresSelector: React.FC<{ onSelect?: () => void }> = ({ onS
       <Trigger />
       
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-[95vw] md:max-w-[600px] p-0 rounded-[32px] overflow-hidden border-none shadow-2xl bg-[#f8fafc] z-[200]">
-          <div className="bg-white px-8 py-6 border-b border-slate-100 flex items-center justify-between sticky top-0 z-10">
-            <DialogHeader className="p-0 space-y-0 text-left">
-              <DialogTitle className="text-[18px] font-black text-slate-800 uppercase tracking-tight">
-                Piattaforme CRM Nexus
+        <DialogContent className="max-w-[95vw] md:max-w-2xl p-0 rounded-2xl overflow-hidden border border-slate-200 shadow-xl bg-white ring-0">
+          <div className="bg-white px-6 py-5 border-b border-slate-100 flex items-center justify-between sticky top-0 z-20">
+            <div className="space-y-0.5">
+              <DialogTitle className="text-xl font-bold text-slate-900 uppercase tracking-tight">
+                Nexus Pipelines
               </DialogTitle>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                {structures.length} Pipeline disponibili nel sistema
+              <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest opacity-80">
+                Seleziona la struttura di lavoro
               </p>
-            </DialogHeader>
+            </div>
             <button 
               onClick={() => setIsOpen(false)}
               className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all border border-slate-100"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
 
-          <ScrollArea className="h-[70vh] md:max-h-[500px] w-full px-6 py-6 border-none">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-8">
+          <div className="overflow-y-auto p-4 bg-slate-50/30 max-h-[70vh] md:max-h-[480px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {structures.map((s) => {
                 const Sicon = iconMap[s.slug] || LayoutGrid;
                 const isActive = activeStructure?.id === s.id;
@@ -91,49 +91,49 @@ export const CRMStructuresSelector: React.FC<{ onSelect?: () => void }> = ({ onS
                     key={s.id}
                     onClick={() => handleSelect(s)}
                     className={cn(
-                      "w-full flex items-center gap-4 p-5 rounded-3xl transition-all text-left group",
+                      "w-full flex items-center gap-4 p-4 rounded-xl transition-all text-left border relative group cursor-pointer",
                       isActive 
-                        ? "bg-blue-600 text-white shadow-xl shadow-blue-100" 
-                        : "bg-white border border-slate-100 shadow-xs text-slate-600 hover:border-blue-200 hover:shadow-md active:scale-[0.98]"
+                        ? "bg-blue-600 border-blue-700 text-white shadow-lg z-10" 
+                        : "bg-white border-slate-200 shadow-sm text-slate-700 hover:border-blue-400 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
                     )}
                   >
                     <div 
                       className={cn(
-                        "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0 transition-transform group-hover:scale-105",
+                        "w-11 h-11 rounded-lg flex items-center justify-center text-white shadow-sm shrink-0",
                         isActive ? "bg-white/20" : ""
                       )}
                       style={!isActive ? { backgroundColor: s.color } : {}}
                     >
-                      <Sicon size={22} />
+                      <Sicon size={22} strokeWidth={2} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-[14px] font-black uppercase tracking-tight block leading-tight truncate">
+                      <span className="text-sm font-bold uppercase tracking-tight block truncate">
                         {s.name}
                       </span>
                       <span className={cn(
-                        "text-[9px] font-bold uppercase tracking-widest mt-1 block",
-                        isActive ? "text-white/70" : "text-slate-400"
+                        "text-[9px] font-medium uppercase tracking-wider block mt-1",
+                        isActive ? "text-white/80" : "text-slate-400"
                       )}>
-                        {isActive ? 'In uso' : 'Seleziona'}
+                        {isActive ? 'Attiva' : 'Clicca per aprire'}
                       </span>
                     </div>
                     {isActive && (
-                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
-                        <Check size={14} strokeWidth={4} />
+                      <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center text-blue-600 shadow-sm">
+                        <Check size={12} strokeWidth={3} />
                       </div>
                     )}
                   </button>
                 );
               })}
             </div>
-          </ScrollArea>
+          </div>
           
-          <div className="bg-white/80 backdrop-blur-sm px-8 py-4 border-t border-slate-100 flex items-center justify-center shrink-0">
+          <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 flex items-center justify-end shrink-0">
             <button 
               onClick={() => setIsOpen(false)}
-              className="text-[11px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors flex items-center gap-2"
+              className="text-[10px] font-bold text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors"
             >
-              Uscita senza selezione <X size={12} />
+              Annulla operazione
             </button>
           </div>
         </DialogContent>

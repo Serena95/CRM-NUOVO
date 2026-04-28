@@ -1,18 +1,22 @@
-export type FeedPostType = 'message' | 'task' | 'event' | 'poll' | 'file' | 'other';
+export type FeedPostType = 'message' | 'task' | 'event' | 'poll' | 'file' | 'other' | 'crm_activity';
 
 export interface FeedPost {
   id: string;
+  tenant_id?: string;
   author_id: string;
   author_name?: string;
   author_photo?: string;
   type: FeedPostType;
   content: string;
-  content_html: string;
+  content_html?: string;
   targets: string[]; // ['all', 'user_id_1', etc.]
+  entity_type?: string;
+  entity_id?: string;
   attachments?: FeedAttachment[];
   task?: FeedTaskData;
   event?: FeedEventData;
   poll?: FeedPollData;
+  metadata?: any;
   reactions: FeedReaction[];
   comments_count: number;
   is_pinned: boolean;
