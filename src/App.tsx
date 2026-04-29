@@ -137,6 +137,11 @@ const App: React.FC = () => {
       case 'deals': // backward compatibility
       case 'contacts':
       case 'companies':
+      case 'contatti':
+      case 'aziende':
+      case 'calendario':
+      case 'automazioni':
+      case 'configurazione':
       case 'activities':
       case 'pipelines':
       case 'pipeline-settings':

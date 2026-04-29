@@ -85,38 +85,42 @@ export const whatsappService = {
   },
 
   async initializeTemplates() {
-    const snap = await getDocs(collection(db, 'whatsapp_templates'));
-    if (!snap.empty) return;
+    try {
+      const snap = await getDocs(collection(db, 'whatsapp_templates'));
+      if (!snap.empty) return;
 
-    const sampleTemplates: Omit<WhatsAppTemplate, 'id'>[] = [
-      {
-        name: 'welcome_message',
-        category: 'MARKETING',
-        language: 'it',
-        body: 'Ciao {{1}}! Benvenuto in Nexus CRM. Come possiamo aiutarti oggi?',
-        status: 'approved',
-        created_at: new Date().toISOString()
-      },
-      {
-        name: 'deal_update',
-        category: 'UTILITY',
-        language: 'it',
-        body: 'Ciao! Il tuo affare {{1}} è stato aggiornato allo stato: {{2}}.',
-        status: 'approved',
-        created_at: new Date().toISOString()
-      },
-      {
-        name: 'meeting_reminder',
-        category: 'UTILITY',
-        language: 'it',
-        body: 'Promemoria: il nostro appuntamento per {{1}} è confermato per domani alle {{2}}.',
-        status: 'approved',
-        created_at: new Date().toISOString()
+      const sampleTemplates: Omit<WhatsAppTemplate, 'id'>[] = [
+        {
+          name: 'welcome_message',
+          category: 'MARKETING',
+          language: 'it',
+          body: 'Ciao {{1}}! Benvenuto in Nexus CRM. Come possiamo aiutarti oggi?',
+          status: 'approved',
+          created_at: new Date().toISOString()
+        },
+        {
+          name: 'deal_update',
+          category: 'UTILITY',
+          language: 'it',
+          body: 'Ciao! Il tuo affare {{1}} è stato aggiornato allo stato: {{2}}.',
+          status: 'approved',
+          created_at: new Date().toISOString()
+        },
+        {
+          name: 'meeting_reminder',
+          category: 'UTILITY',
+          language: 'it',
+          body: 'Promemoria: il nostro appuntamento per {{1}} è confermato per domani alle {{2}}.',
+          status: 'approved',
+          created_at: new Date().toISOString()
+        }
+      ];
+
+      for (const t of sampleTemplates) {
+        await addDoc(collection(db, 'whatsapp_templates'), t);
       }
-    ];
-
-    for (const t of sampleTemplates) {
-      await addDoc(collection(db, 'whatsapp_templates'), t);
+    } catch (error) {
+      console.warn("WhatsApp templates initialization skipped or failed:", error);
     }
   },
 

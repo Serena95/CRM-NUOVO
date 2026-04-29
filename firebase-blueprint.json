@@ -72,6 +72,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "workspace_id": { "type": "string" },
         "tenantId": { "type": "string" },
         "title": { "type": "string" },
         "pipelineId": { "type": "string" },
@@ -594,6 +595,59 @@
       },
       "required": ["id", "postId", "authorId", "content", "createdAt"]
     },
+    "CRMWorkspace": {
+      "title": "CRMWorkspace",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "owner_id": { "type": "string" },
+        "settings": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CRMWorkspaceMember": {
+      "title": "CRMWorkspaceMember",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workspace_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "role": { "type": "string" },
+        "joined_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CRMAutomation": {
+      "title": "CRMAutomation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pipeline_id": { "type": "string" },
+        "stage_id": { "type": "string" },
+        "name": { "type": "string" },
+        "trigger": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "config": { "type": "object" }
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "type": "string" },
+              "config": { "type": "object" }
+            }
+          }
+        },
+        "is_active": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
     "CRMNotification": {
       "title": "CRMNotification",
       "type": "object",
@@ -681,7 +735,7 @@
       "description": "CRM Activities."
     },
     "/crm_automations/{id}": {
-      "schema": "object",
+      "schema": "CRMAutomation",
       "description": "CRM Automations."
     },
     "/crm_field_definitions/{id}": {
@@ -739,6 +793,14 @@
     "/crm_portal_access/{id}": {
       "schema": "ClientPortalAccess",
       "description": "Tokens for client portal access."
+    },
+    "/crm_workspaces/{id}": {
+      "schema": "CRMWorkspace",
+      "description": "CRM Workspaces (Companies)."
+    },
+    "/crm_workspace_members/{id}": {
+      "schema": "CRMWorkspaceMember",
+      "description": "User memberships for workspaces."
     },
     "/notifications/{notifId}": {
       "schema": "CRMNotification",

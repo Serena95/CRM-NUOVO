@@ -18,7 +18,7 @@ import { Loader2, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DetailDrawer } from '../DetailDrawer';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { AutomationBuilder } from '../AutomationBuilder';
+import { AutomationStageManager } from '../AutomationStageManager';
 import { CRMStage } from '@/types/crm';
 
 import { CreateItemModal } from '../CreateItemModal';
@@ -213,9 +213,11 @@ export const KanbanBoard: React.FC = () => {
         stageId={selectedStageId}
       />
 
-      {automationStage && (
-        <AutomationBuilder 
+      {automationStage && activeStructure && (
+        <AutomationStageManager 
+          pipeline={activeStructure}
           stage={automationStage} 
+          allStages={stages}
           onClose={() => setAutomationStage(null)} 
         />
       )}

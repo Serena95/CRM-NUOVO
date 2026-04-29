@@ -40,6 +40,12 @@ import { CreateItemModal } from '@/components/crm/CreateItemModal';
 import { AdvancedFilters } from '@/components/crm/AdvancedFilters';
 import { DetailDrawer } from '@/components/crm/DetailDrawer';
 import { CRMHeaderKPIs } from '@/components/crm/CRMHeaderKPIs';
+import { CRMReports } from '@/components/crm/CRMReports';
+import { WorkspaceSelector } from '@/components/crm/WorkspaceSelector';
+import { ContactList } from '@/components/crm/ContactList';
+import { CompanyList } from '@/components/crm/CompanyList';
+import { AutomationBuilder } from '@/components/crm/AutomationBuilder';
+import { CRMConfig } from '@/components/crm/CRMConfig';
 
 const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }> = ({ activeTab: propActiveTab, setActiveTab }) => {
   const { 
@@ -47,6 +53,7 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
     isLoading, 
     structures, 
     activeStructure, 
+    stages,
     switchStructure, 
     error, 
     unsubscribeFromChanges,
@@ -58,6 +65,7 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
 
   const [activeViewTab, setActiveViewTab] = useState('affari');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createModalConfig, setCreateModalConfig] = useState<{ type: any; pipelineId?: string; initialData?: any }>({ type: 'deal' });
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -72,9 +80,28 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
       }
     };
 
+    const handleOpenCreateDeal = (event: any) => {
+      const { contactId, contactName, companyId, companyName } = event.detail;
+      setCreateModalConfig({
+        type: 'deal',
+        pipelineId: activeStructure?.id,
+        initialData: {
+          contact_id: contactId,
+          contact: contactName,
+          company_id: companyId,
+          company: companyName
+        }
+      });
+      setIsCreateModalOpen(true);
+    };
+
     window.addEventListener('crm:openDeal', handleOpenDeal);
-    return () => window.removeEventListener('crm:openDeal', handleOpenDeal);
-  }, []);
+    window.addEventListener('crm:openCreateDeal', handleOpenCreateDeal);
+    return () => {
+      window.removeEventListener('crm:openDeal', handleOpenDeal);
+      window.removeEventListener('crm:openCreateDeal', handleOpenCreateDeal);
+    };
+  }, [activeStructure?.id]);
 
   useEffect(() => {
     // Force set default if no specific tab or if it's generic 'crm'
@@ -117,7 +144,12 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
         'crm': 'affari',
         'leads': 'leads',
         'contacts': 'contatti',
+        'contatti': 'contatti',
         'companies': 'aziende',
+        'aziende': 'aziende',
+        'calendario': 'calendario',
+        'automazioni': 'automazioni',
+        'configurazione': 'configurazione',
         'analytics': 'analytics',
         'activities': 'analytics',
         'preventivi': 'affari'
@@ -147,10 +179,7 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
       <div className="bg-white border-b border-slate-200 shrink-0 shadow-sm z-30 sticky top-0 md:relative">
         <div className="px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4 md:gap-6">
-            <div className="hidden md:flex items-center gap-2">
-              <span className="text-[14px] font-medium text-slate-400 capitalize">CRM / </span>
-              <span className="text-[14px] font-black text-slate-800 uppercase tracking-tight">Affari</span>
-            </div>
+            <WorkspaceSelector />
             
             <div className="hidden md:block h-6 w-[1px] bg-slate-200" />
             
@@ -241,33 +270,41 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
           </div>
         </div>
 
-        {/* Sub-navigation bar - Horizontal scroll on mobile */}
-        <div className="px-4 md:px-6 flex items-center gap-6 md:gap-8 border-t border-slate-50 overflow-x-auto no-scrollbar">
-           {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => {
-                setActiveViewTab(tab.id);
-                // Update global state too so refresh works correctly
-                setActiveTab(tab.id);
-              }}
-              className={cn(
-                "py-3 text-[11px] font-black uppercase tracking-[0.15em] relative transition-all",
-                activeViewTab === tab.id ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
-              )}
-            >
-              <div className="flex items-center gap-2">
-                <tab.icon size={14} />
-                {tab.label}
-              </div>
-              {activeViewTab === tab.id && (
-                <motion.div 
-                  layoutId="crmActiveTab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full"
-                />
-              )}
-            </button>
-          ))}
+        {/* Sub-navigation bar - Horizontal scroll with utility */}
+        <div className="relative group px-4 md:px-6 border-t border-slate-50">
+          <div 
+            id="crm-tabs-container"
+            className="flex items-center gap-6 md:gap-8 overflow-x-auto scrollbar-hide py-1 no-scrollbar"
+          >
+             {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveViewTab(tab.id);
+                  setActiveTab(tab.id);
+                }}
+                className={cn(
+                  "py-3 text-[11px] font-black uppercase tracking-[0.15em] relative transition-all whitespace-nowrap flex-shrink-0",
+                  activeViewTab === tab.id ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <tab.icon size={14} />
+                  {tab.label}
+                </div>
+                {activeViewTab === tab.id && (
+                  <motion.div 
+                    layoutId="crmActiveTab"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full"
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+          
+          {/* Subtle scroll masks for overflow awareness */}
+          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity md:hidden" />
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity md:hidden" />
         </div>
       </div>
 
@@ -454,6 +491,61 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
             >
               <TaskKanban deals={useCRMStore.getState().getFilteredDeals()} />
             </motion.div>
+          ) : activeViewTab === 'contatti' ? (
+            <motion.div
+              key="contacts"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="h-full flex flex-col"
+            >
+              <ContactList />
+            </motion.div>
+          ) : activeViewTab === 'aziende' ? (
+            <motion.div
+              key="companies"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="h-full flex flex-col"
+            >
+              <CompanyList />
+            </motion.div>
+          ) : activeViewTab === 'automazioni' ? (
+            <motion.div
+              key="automations"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="h-full flex flex-col overflow-auto"
+            >
+              <AutomationBuilder 
+                pipeline={activeStructure!} 
+                stages={stages} 
+                onClose={() => {}} 
+                onSave={() => {}} 
+              />
+            </motion.div>
+          ) : activeViewTab === 'analytics' ? (
+            <motion.div
+              key="crm-reports"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="h-full flex flex-col"
+            >
+              <CRMReports pipeline={activeStructure} />
+            </motion.div>
+          ) : activeViewTab === 'configurazione' ? (
+            <motion.div
+              key="config"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="h-full flex flex-col"
+            >
+              <CRMConfig />
+            </motion.div>
           ) : (
             <motion.div 
               key="fallback"
@@ -489,8 +581,9 @@ const CRM: React.FC<{ activeTab?: string, setActiveTab: (tab: string) => void }>
       <CreateItemModal 
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        type="deal"
-        pipelineId={activeStructure?.id}
+        type={createModalConfig.type}
+        pipelineId={createModalConfig.pipelineId}
+        initialData={createModalConfig.initialData}
       />
       
       <DetailDrawer 

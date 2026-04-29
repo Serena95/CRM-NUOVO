@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CRMStructure, CRMStage, CRMDeal, CRMCustomFieldDefinition, SmartProcess } from '@/types/crm';
+import { CRMStructure, CRMStage, CRMDeal, CRMCustomFieldDefinition, SmartProcess, CRMWorkspace, CRMContact, CRMCompany } from '@/types/crm';
 import { supabaseCRMService } from '@/services/supabaseCRMService';
 import { CRM_STRUCTURES, CRM_PIPELINE_STAGES } from '@/constants/crm';
 import { toast } from 'sonner';
@@ -8,14 +8,15 @@ import { collection, query, where, onSnapshot, Unsubscribe } from 'firebase/fire
 
 interface CRMFilters {
   search: string;
-  responsabile: string[];
-  stage: string[];
-  valore: [number, number];
-  dataCreazione: { from?: Date; to?: Date };
-  ultimaAttivita: string;
-  scorePreanalisi: [number, number];
-  struttura: string[];
-  stato: string[];
+  pipeline: string; // ID della struttura attiva
+  stage: string[];  // ID degli stage
+  owner: string[];  // ID degli assegnatari
+  dateFrom: Date | null;
+  dateTo: Date | null;
+  valueMin: number | null;
+  valueMax: number | null;
+  score: [number, number];
+  status: string[]; // 'attivo', 'vinto', 'perso'
 }
 
 interface SavedFilter {
@@ -27,8 +28,12 @@ interface SavedFilter {
 interface CRMState {
   structures: CRMStructure[];
   activeStructure: CRMStructure | null;
+  workspaces: CRMWorkspace[];
+  activeWorkspace: CRMWorkspace | null;
   stages: CRMStage[];
   deals: CRMDeal[];
+  contacts: CRMContact[];
+  companies: CRMCompany[];
   customFields: CRMCustomFieldDefinition[];
   smartProcesses: SmartProcess[];
   isLoading: boolean;
@@ -38,6 +43,7 @@ interface CRMState {
   
   // Filters
   filters: CRMFilters;
+  searchDebounceTimer: any;
   savedFilters: SavedFilter[];
   activeSavedFilterId: string | null;
   activeSavedFilterLabel: string | null;
@@ -51,11 +57,17 @@ interface CRMState {
 
   setStructures: (structures: CRMStructure[]) => void;
   setActiveStructure: (structure: CRMStructure) => void;
+  setWorkspaces: (workspaces: CRMWorkspace[]) => void;
+  setActiveWorkspace: (workspace: CRMWorkspace) => void;
+  switchWorkspace: (workspace: CRMWorkspace) => Promise<void>;
   setStages: (stages: CRMStage[]) => void;
   setDeals: (deals: CRMDeal[]) => void;
+  setContacts: (contacts: CRMContact[]) => void;
+  setCompanies: (companies: CRMCompany[]) => void;
   setCustomFields: (fields: CRMCustomFieldDefinition[]) => void;
   
   setFilters: (filters: Partial<CRMFilters>) => void;
+  refreshDealsWithFilters: () => Promise<void>;
   setCRMView: (view: 'kanban' | 'list' | 'calendar') => void;
   resetFilters: () => void;
   applySavedFilter: (id: string) => void;
@@ -65,6 +77,8 @@ interface CRMState {
   searchGlobal: (query: string) => Promise<void>;
   
   fetchInitialData: (preferredStructureSlug?: string, force?: boolean) => Promise<void>;
+  fetchContacts: () => Promise<void>;
+  fetchCompanies: () => Promise<void>;
   switchStructure: (structure: CRMStructure) => Promise<void>;
   moveDeal: (dealId: string, toStageId: string) => Promise<void>;
   subscribeToChanges: (structureId: string) => void;
@@ -75,21 +89,26 @@ interface CRMState {
 
 const DEFAULT_FILTERS: CRMFilters = {
   search: '',
-  responsabile: [],
+  pipeline: '',
   stage: [],
-  valore: [0, 1000000],
-  dataCreazione: {},
-  ultimaAttivita: 'all',
-  scorePreanalisi: [0, 100],
-  struttura: [],
-  stato: []
+  owner: [],
+  dateFrom: null,
+  dateTo: null,
+  valueMin: null,
+  valueMax: null,
+  score: [0, 100],
+  status: []
 };
 
 export const useCRMStore = create<CRMState>((set, get) => ({
   structures: [],
   activeStructure: null,
+  workspaces: [],
+  activeWorkspace: null,
   stages: [],
   deals: [],
+  contacts: [],
+  companies: [],
   customFields: [],
   smartProcesses: [],
   isLoading: false,
@@ -99,12 +118,12 @@ export const useCRMStore = create<CRMState>((set, get) => ({
 
   // Filters state
   filters: DEFAULT_FILTERS,
+  searchDebounceTimer: null,
   savedFilters: [
-    { id: 'miei', label: 'I miei affari', filters: { responsabile: ['user-1'] } }, 
-    { id: 'richiamare', label: 'Da richiamare', filters: { stage: ['verifica-telefonica'] } },
-    { id: 'trattativa', label: 'In trattativa', filters: { stage: ['invio-preventivo'] } },
-    { id: 'contratti', label: 'Contratti', filters: { stage: ['contratto'] } },
-    { id: 'vinti', label: 'Vinti', filters: { stage: ['affare-vinto'] } },
+    { id: 'miei', label: 'I miei affari', filters: { owner: ['user-1'] } }, 
+    { id: 'vinti', label: 'Affari Vinti', filters: { status: ['vinto'] } },
+    { id: 'attivi', label: 'Affari Attivi', filters: { status: ['attivo'] } },
+    { id: 'valore-alto', label: 'Valore Alto (>10k)', filters: { valueMin: 10000 } },
   ],
   activeSavedFilterId: null,
   activeSavedFilterLabel: null,
@@ -116,28 +135,100 @@ export const useCRMStore = create<CRMState>((set, get) => ({
 
   setStructures: (structures) => set({ structures }),
   setActiveStructure: (activeStructure) => set({ activeStructure }),
+  setWorkspaces: (workspaces) => set({ workspaces }),
+  setActiveWorkspace: (activeWorkspace) => set({ activeWorkspace }),
+  
+  switchWorkspace: async (workspace) => {
+    set({ activeWorkspace: workspace, isLoading: true });
+    try {
+      const structures = await supabaseCRMService.getStructures(workspace.id);
+      set({ structures });
+      
+      if (structures.length > 0) {
+        await get().switchStructure(structures[0]);
+      } else {
+        set({ activeStructure: null, stages: [], deals: [] });
+      }
+    } catch (e) {
+      toast.error("Errore nel cambio workspace");
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  
   setStages: (stages) => set({ stages }),
   setDeals: (deals) => set({ deals }),
+  setContacts: (contacts) => set({ contacts }),
+  setCompanies: (companies) => set({ companies }),
   setCustomFields: (customFields) => set({ customFields }),
 
-  setFilters: (newFilters) => set((state) => ({ 
-    filters: { ...state.filters, ...newFilters },
-    activeSavedFilterId: null,
-    activeSavedFilterLabel: null
-  })),
+  setFilters: (newFilters) => {
+    const state = get();
+    const updatedFilters = { ...state.filters, ...newFilters };
+    
+    // Se cambia la pipeline, reset stage filter
+    if (newFilters.pipeline && newFilters.pipeline !== state.filters.pipeline) {
+      updatedFilters.stage = [];
+    }
+
+    set({ 
+      filters: updatedFilters,
+      activeSavedFilterId: null,
+      activeSavedFilterLabel: null
+    });
+
+    // Debounce per ricerca, esecuzione immediata per altri filtri
+    if ('search' in newFilters) {
+      if (state.searchDebounceTimer) clearTimeout(state.searchDebounceTimer);
+      const timer = setTimeout(() => {
+        get().refreshDealsWithFilters();
+      }, 300);
+      set({ searchDebounceTimer: timer });
+    } else {
+      get().refreshDealsWithFilters();
+    }
+  },
+
+  refreshDealsWithFilters: async () => {
+    const { filters, activeWorkspace, activeStructure } = get();
+    const pipelineId = filters.pipeline || activeStructure?.id;
+    if (!pipelineId || !activeWorkspace) return;
+
+    set({ isLoading: true });
+    try {
+      // Passiamo solo i filtri che Firestore può gestire bene in una query base
+      const deals = await supabaseCRMService.getDeals(pipelineId, activeWorkspace.id, {
+        owner: filters.owner,
+        stage: filters.stage
+      });
+      set({ deals });
+    } catch (e) {
+      console.error("Error refreshing deals with filters:", e);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 
   setCRMView: (crmView) => set({ crmView }),
 
-  resetFilters: () => set({ filters: DEFAULT_FILTERS, activeSavedFilterId: null, activeSavedFilterLabel: null }),
+  resetFilters: () => {
+    set({ 
+      filters: { ...DEFAULT_FILTERS, pipeline: get().activeStructure?.id || '' }, 
+      activeSavedFilterId: null, 
+      activeSavedFilterLabel: null 
+    });
+    get().refreshDealsWithFilters();
+  },
 
   applySavedFilter: (id) => {
     const saved = get().savedFilters.find(f => f.id === id);
     if (saved) {
       set({ 
-        filters: { ...DEFAULT_FILTERS, ...saved.filters },
+        filters: { ...DEFAULT_FILTERS, pipeline: get().activeStructure?.id || '', ...saved.filters },
         activeSavedFilterId: id,
         activeSavedFilterLabel: saved.label
       });
+      get().refreshDealsWithFilters();
     }
   },
 
@@ -163,7 +254,7 @@ export const useCRMStore = create<CRMState>((set, get) => ({
     }
     set({ isGlobalSearching: true });
     try {
-      const results = await supabaseCRMService.searchGlobalDeals(queryStr);
+      const results = await supabaseCRMService.searchGlobalDeals(queryStr, get().activeWorkspace?.id);
       set({ globalSearchResults: results });
     } catch (e) {
       console.error("Global search error:", e);
@@ -175,6 +266,7 @@ export const useCRMStore = create<CRMState>((set, get) => ({
   getFilteredDeals: () => {
     const { deals, filters, stages } = get();
     return deals.filter(deal => {
+      // In-memory filters per maggiore reattività su set di dati locali
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
         const matchesSearch = 
@@ -183,31 +275,30 @@ export const useCRMStore = create<CRMState>((set, get) => ({
           deal.contact?.toLowerCase().includes(searchLower);
         if (!matchesSearch) return false;
       }
-      if (filters.responsabile.length > 0 && !filters.responsabile.includes(deal.assigned_to)) return false;
+      
+      if (filters.owner.length > 0 && !filters.owner.includes(deal.assigned_to)) return false;
       if (filters.stage.length > 0 && !filters.stage.includes(deal.stage_id)) return false;
-      if (deal.value < filters.valore[0] || deal.value > filters.valore[1]) return false;
+      
+      if (filters.valueMin !== null && deal.value < filters.valueMin) return false;
+      if (filters.valueMax !== null && deal.value > filters.valueMax) return false;
+      
       if (deal.preanalysis_result) {
         const score = deal.preanalysis_result.score;
-        if (score < filters.scorePreanalisi[0] || score > filters.scorePreanalisi[1]) return false;
+        if (score < filters.score[0] || score > filters.score[1]) return false;
       }
-      if (filters.dataCreazione.from || filters.dataCreazione.to) {
+      
+      if (filters.dateFrom || filters.dateTo) {
         const created = new Date(deal.created_at);
-        if (filters.dataCreazione.from && created < filters.dataCreazione.from) return false;
-        if (filters.dataCreazione.to && created > filters.dataCreazione.to) return false;
+        if (filters.dateFrom && created < filters.dateFrom) return false;
+        if (filters.dateTo && created > filters.dateTo) return false;
       }
-      if (filters.stato.length > 0) {
+      
+      if (filters.status.length > 0) {
         const stage = stages.find(s => s.id === deal.stage_id);
         const dealStatus = stage?.is_won ? 'vinto' : (stage?.is_lost ? 'perso' : 'attivo');
-        if (!filters.stato.includes(dealStatus)) return false;
+        if (!filters.status.includes(dealStatus)) return false;
       }
-      if (filters.ultimaAttivita !== 'all') {
-        const lastUpdate = new Date(deal.updated_at || deal.created_at);
-        const diffDays = (Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24);
-        if (filters.ultimaAttivita === 'today' && diffDays > 1) return false;
-        if (filters.ultimaAttivita === 'week' && diffDays > 7) return false;
-        if (filters.ultimaAttivita === 'month' && diffDays > 30) return false;
-        if (filters.ultimaAttivita === 'inactive' && diffDays < 5) return false;
-      }
+      
       return true;
     });
   },
@@ -215,10 +306,19 @@ export const useCRMStore = create<CRMState>((set, get) => ({
   subscribeToChanges: (structureId) => {
     get().unsubscribeFromChanges();
 
-    const q = query(
+    const { activeWorkspace } = get();
+    let q = query(
       collection(db, 'crm_deals'), 
       where('structure_id', '==', structureId)
     );
+
+    if (activeWorkspace) {
+      q = query(
+        collection(db, 'crm_deals'), 
+        where('workspace_id', '==', activeWorkspace.id),
+        where('structure_id', '==', structureId)
+      );
+    }
 
     const unsub = onSnapshot(q, (snapshot) => {
       const deals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMDeal));
@@ -244,13 +344,32 @@ export const useCRMStore = create<CRMState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      try {
-        await supabaseCRMService.initializeCRM();
-      } catch (e) { 
-        console.warn("Init skipped or already done"); 
+      // 1. Fetch Workspaces
+      const workspaces = await supabaseCRMService.getWorkspaces();
+      
+      if (!workspaces || workspaces.length === 0) {
+        // Create an initial workspace if none exists for the current user
+        try {
+          const newWs = await supabaseCRMService.createWorkspace("La mia Azienda");
+          workspaces.push(newWs);
+        } catch (wsError) {
+          console.error("Failed to create initial workspace", wsError);
+        }
       }
 
-      const structures = await supabaseCRMService.getStructures();
+      const activeWs = get().activeWorkspace || (workspaces && workspaces.length > 0 ? workspaces[0] : null);
+      
+      if (activeWs) {
+        try {
+          await supabaseCRMService.initializeCRM(activeWs.id);
+        } catch (e) { 
+          console.warn("Init failed for workspace", activeWs.id); 
+        }
+      }
+
+      // 2. Fetch data for active workspace
+      const structures = await supabaseCRMService.getStructures(activeWs?.id);
+      
       if (structures && structures.length > 0) {
         let activeStruct = structures[0];
         if (preferredStructureSlug) {
@@ -258,18 +377,24 @@ export const useCRMStore = create<CRMState>((set, get) => ({
            if (found) activeStruct = found;
         }
 
-        const [stages, deals, customFields, smartProcesses] = await Promise.all([
+        const [stages, deals, contacts, companies, customFields, smartProcesses] = await Promise.all([
           supabaseCRMService.getStages(activeStruct.id),
-          supabaseCRMService.getDeals(activeStruct.id),
+          supabaseCRMService.getDeals(activeStruct.id, activeWs?.id),
+          supabaseCRMService.getContacts(activeWs?.id),
+          supabaseCRMService.getCompanies(activeWs?.id),
           supabaseCRMService.getCustomFieldDefinitions(),
           supabaseCRMService.getSmartProcesses()
         ]);
         
         set({ 
+          workspaces,
+          activeWorkspace: activeWs,
           structures, 
           activeStructure: activeStruct,
           stages,
           deals,
+          contacts,
+          companies,
           customFields,
           smartProcesses,
           initialLoadDone: true
@@ -277,6 +402,7 @@ export const useCRMStore = create<CRMState>((set, get) => ({
         
         get().subscribeToChanges(activeStruct.id);
       } else {
+        set({ workspaces, activeWorkspace: activeWs, structures: [], activeStructure: null, initialLoadDone: true });
         throw new Error("No CRM data found");
       }
     } catch (error: any) {
@@ -287,6 +413,7 @@ export const useCRMStore = create<CRMState>((set, get) => ({
         name: s.name,
         slug: s.slug,
         color: s.color,
+        workspace_id: 'local-workspace',
         created_at: new Date().toISOString()
       }));
       
@@ -314,6 +441,34 @@ export const useCRMStore = create<CRMState>((set, get) => ({
     }
   },
 
+  fetchContacts: async () => {
+    const { activeWorkspace } = get();
+    if (!activeWorkspace) return;
+    set({ isLoading: true });
+    try {
+      const contacts = await supabaseCRMService.getContacts(activeWorkspace.id);
+      set({ contacts });
+    } catch (e) {
+      console.error("Error fetching contacts", e);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  fetchCompanies: async () => {
+    const { activeWorkspace } = get();
+    if (!activeWorkspace) return;
+    set({ isLoading: true });
+    try {
+      const companies = await supabaseCRMService.getCompanies(activeWorkspace.id);
+      set({ companies });
+    } catch (e) {
+      console.error("Error fetching companies", e);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
   switchStructure: async (structure) => {
     set({ isLoading: true, activeStructure: structure, stages: [], deals: [], error: null });
 
@@ -334,7 +489,7 @@ export const useCRMStore = create<CRMState>((set, get) => ({
       } else {
         const [stages, deals] = await Promise.all([
           supabaseCRMService.getStages(structure.id),
-          supabaseCRMService.getDeals(structure.id)
+          supabaseCRMService.getDeals(structure.id, get().activeWorkspace?.id)
         ]);
         set({ stages, deals });
         get().subscribeToChanges(structure.id);

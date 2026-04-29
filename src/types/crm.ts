@@ -1,5 +1,39 @@
+export interface CRMWorkspace {
+  id: string;
+  name: string;
+  owner_id: string;
+  logo_url?: string;
+  settings: {
+    currency: string;
+    timezone: string;
+    primary_color?: string;
+  };
+  created_at: string;
+}
+
+export interface CRMActivity {
+  id: string;
+  entity_id: string;
+  entity_type: 'contact' | 'company' | 'deal';
+  type: 'note' | 'call' | 'email' | 'meeting' | 'system';
+  title: string;
+  description: string;
+  author_name: string;
+  created_at: string;
+}
+
+export interface CRMWorkspaceMember {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  user_email?: string;
+  role: 'owner' | 'admin' | 'member';
+  joined_at: string;
+}
+
 export interface CRMStructure {
   id: string;
+  workspace_id: string;
   name: string;
   slug: string;
   color: string;
@@ -17,7 +51,34 @@ export interface CRMStage {
   has_automations?: boolean;
 }
 
-export type CRMAutomationType = 'task' | 'email' | 'assignee' | 'note' | 'webhook' | 'notification' | 'timer' | 'whatsapp';
+export type CRMAutomationType = 'task' | 'email' | 'assignee' | 'note' | 'webhook' | 'notification' | 'timer' | 'whatsapp' | 'wait' | 'change_stage';
+
+export type CRMAutomationTriggerType = 
+  | 'stage_changed' 
+  | 'deal_created' 
+  | 'timer' 
+  | 'field_updated' 
+  | 'quote_accepted';
+
+export interface CRMAutomationAction {
+  id: string;
+  type: CRMAutomationType;
+  config: {
+    title?: string;
+    description?: string;
+    recipient?: string;
+    subject?: string;
+    body?: string;
+    assignee_id?: string;
+    url?: string;
+    delay_minutes?: number;
+    message?: string;
+    wait_duration?: number;
+    wait_unit?: 'minutes' | 'hours' | 'days';
+    content?: string;
+    stage_id?: string;
+  };
+}
 
 export type CRMCustomFieldType = 
   | 'text' 
@@ -87,21 +148,17 @@ export interface CRMCustomFieldDefinition {
 
 export interface CRMAutomation {
   id: string;
+  pipeline_id: string;
   stage_id: string;
-  type: CRMAutomationType;
-  config: {
-    title?: string;
-    description?: string;
-    recipient?: string;
-    subject?: string;
-    body?: string;
-    assignee_id?: string;
-    url?: string;
-    delay_minutes?: number;
-    message?: string;
+  name: string;
+  trigger: {
+    type: CRMAutomationTriggerType;
+    config: any;
   };
+  actions: CRMAutomationAction[];
   is_active: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 import { UserRole } from './index';
@@ -117,11 +174,14 @@ export interface CRMUser {
 
 export interface CRMDeal {
   id: string;
+  workspace_id: string;
   structure_id: string;
   stage_id: string;
   title: string;
   company: string;
+  company_id?: string;
   contact: string;
+  contact_id?: string;
   phone: string;
   email: string;
   value: number;
@@ -317,4 +377,38 @@ export interface CRMTask {
   updated_at: string;
   created_by: string;
   completed_at?: string;
+}
+
+export interface CRMContact {
+  id: string;
+  workspace_id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company_id?: string;
+  company_name?: string;
+  position?: string;
+  source?: string;
+  assigned_to: string;
+  status: 'lead' | 'customer' | 'prospect';
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CRMCompany {
+  id: string;
+  workspace_id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  industry?: string;
+  size?: string;
+  address?: string;
+  vat?: string;
+  assigned_to: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
 }

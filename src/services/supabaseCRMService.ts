@@ -15,14 +15,174 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
-import { CRMStructure, CRMStage, CRMDeal, CRMFormResult, PreanalysisResult, CRMAutomation, CRMCustomFieldDefinition, SmartProcess, SmartRecord, SmartFieldDefinition, WhatsAppMessage, CRMCalendarEvent, CRMTask, CRMSignature, CRMQuote, CRMProduct, ClientPortalAccess } from '@/types/crm';
+import { CRMStructure, CRMStage, CRMDeal, CRMFormResult, PreanalysisResult, CRMAutomation, CRMCustomFieldDefinition, SmartProcess, SmartRecord, SmartFieldDefinition, WhatsAppMessage, CRMCalendarEvent, CRMTask, CRMSignature, CRMQuote, CRMProduct, ClientPortalAccess, CRMWorkspace, CRMWorkspaceMember, CRMContact, CRMCompany, CRMActivity } from '@/types/crm';
 import { CRM_STRUCTURES, CRM_PIPELINE_STAGES } from '@/constants/crm';
 import { notificationService } from './notificationService';
 import { whatsappService } from './whatsappService';
 import { NotificationType } from '@/types/notifications';
 import { supabaseFeedService } from './supabaseFeedService';
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 export const supabaseCRMService = {
+  // Workspaces
+  async getWorkspaces() {
+    const user = auth.currentUser;
+    if (!user) return [];
+    
+    // Get memberships first
+    const memberQuery = query(collection(db, 'crm_workspace_members'), where('user_id', '==', user.uid));
+    const memberSnap = await getDocs(memberQuery);
+    const workspaceIds = memberSnap.docs.map(doc => doc.data().workspace_id);
+    
+    if (workspaceIds.length === 0) {
+      // Create default workspace if none exists? 
+      // For this implementation, we assume at least one exists or we create one on startup if needed.
+      return [];
+    }
+    
+    // Fetch workspace details
+    const workspaces: CRMWorkspace[] = [];
+    for (const wid of workspaceIds) {
+      const wSnap = await getDoc(doc(db, 'crm_workspaces', wid));
+      if (wSnap.exists()) {
+        workspaces.push({ id: wSnap.id, ...wSnap.data() } as CRMWorkspace);
+      }
+    }
+    return workspaces;
+  },
+
+  async createWorkspace(name: string) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Not authenticated");
+    
+    const workspaceId = `ws-${Math.random().toString(36).substr(2, 9)}`;
+    const workspaceData: Partial<CRMWorkspace> = {
+      name,
+      owner_id: user.uid,
+      settings: {
+        currency: 'EUR',
+        timezone: 'Europe/Rome'
+      },
+      created_at: new Date().toISOString()
+    };
+    
+    await setDoc(doc(db, 'crm_workspaces', workspaceId), workspaceData);
+    
+    const memberId = `${workspaceId}_${user.uid}`;
+    await setDoc(doc(db, 'crm_workspace_members', memberId), {
+      workspace_id: workspaceId,
+      user_id: user.uid,
+      role: 'owner',
+      joined_at: new Date().toISOString()
+    });
+    
+    return { id: workspaceId, ...workspaceData } as CRMWorkspace;
+  },
+
+  async saveWorkspace(workspace: CRMWorkspace) {
+    const { id, ...data } = workspace;
+    try {
+      await updateDoc(doc(db, 'crm_workspaces', id), {
+        ...data,
+        updated_at: new Date().toISOString()
+      });
+      return workspace;
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `crm_workspaces/${id}`);
+      throw e;
+    }
+  },
+
+  async getWorkspaceMembers(workspaceId: string) {
+    try {
+      const q = query(collection(db, 'crm_workspace_members'), where('workspace_id', '==', workspaceId));
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMWorkspaceMember));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.LIST, `crm_workspace_members`);
+      throw e;
+    }
+  },
+
+  async getActivities() {
+    try {
+      const q = query(collection(db, 'crm_activities'), orderBy('created_at', 'desc'));
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMActivity));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.LIST, 'crm_activities');
+      throw e;
+    }
+  },
+
+  async createActivity(activity: any) {
+    try {
+      const docRef = await addDoc(collection(db, 'crm_activities'), {
+        ...activity,
+        created_at: new Date().toISOString()
+      });
+      return { id: docRef.id, ...activity };
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, 'crm_activities');
+      throw e;
+    }
+  },
+
+  async deleteActivity(id: string) {
+    try {
+      await deleteDoc(doc(db, 'crm_activities', id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `crm_activities/${id}`);
+      throw e;
+    }
+  },
+
   // Quotes & Products
   async getProducts() {
     const q = query(collection(db, 'crm_products'), orderBy('name', 'asc'));
@@ -96,6 +256,37 @@ export const supabaseCRMService = {
     const snap = await getDoc(doc(db, 'crm_portal_access', token));
     if (!snap.exists()) return null;
     return snap.data() as ClientPortalAccess;
+  },
+
+  // Reporting & Analytics
+  async getReportingDeals(filters: { 
+    startDate?: string; 
+    endDate?: string; 
+    pipelineId?: string;
+    userId?: string;
+    status?: string;
+    workspaceId?: string;
+  }) {
+    let q = query(collection(db, 'crm_deals'), orderBy('created_at', 'desc'));
+    
+    if (filters.workspaceId) {
+      q = query(collection(db, 'crm_deals'), where('workspace_id', '==', filters.workspaceId), orderBy('created_at', 'desc'));
+    }
+    
+    const snap = await getDocs(q);
+    let deals = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMDeal));
+
+    if (filters.pipelineId) deals = deals.filter(d => d.structure_id === filters.pipelineId);
+    if (filters.userId) deals = deals.filter(d => d.assigned_to === filters.userId);
+    if (filters.startDate) deals = deals.filter(d => d.created_at >= filters.startDate!);
+    if (filters.endDate) deals = deals.filter(d => d.created_at <= filters.endDate!);
+    if (filters.status) {
+      if (filters.status === 'won') deals = deals.filter(d => d.stage_id.toLowerCase().includes('vinto'));
+      else if (filters.status === 'lost') deals = deals.filter(d => d.stage_id.toLowerCase().includes('perso'));
+      else deals = deals.filter(d => d.stage_id === filters.status);
+    }
+
+    return deals;
   },
 
   // Signatures
@@ -218,79 +409,112 @@ export const supabaseCRMService = {
     });
   },
 
-  // Initialize CRM structures and stages if they don't exist
-  async initializeCRM() {
+  // Initialize CRM structures and stages if they don't exist for a workspace
+  async initializeCRM(workspaceId?: string) {
+    if (!workspaceId) return;
+
     try {
       // Init WhatsApp Templates
       await whatsappService.initializeTemplates();
 
       const structuresRef = collection(db, 'crm_structures');
-      const structsSnap = await getDocs(structuresRef);
+      const qStructs = query(structuresRef, where('workspace_id', '==', workspaceId));
+      let structsSnap;
+      try {
+        structsSnap = await getDocs(qStructs);
+      } catch (e) {
+        handleFirestoreError(e, OperationType.LIST, 'crm_structures');
+        return; // handleFirestoreError throws, but for TS
+      }
+
       const existingSlugs = new Set(structsSnap.docs.map(doc => doc.data().slug));
       
       const newStructuresToInsert = CRM_STRUCTURES.filter(s => !existingSlugs.has(s.slug));
 
       for (const s of newStructuresToInsert) {
-        await addDoc(structuresRef, {
-          name: s.name,
-          slug: s.slug,
-          color: s.color,
-          created_at: new Date().toISOString()
-        });
+        try {
+          await addDoc(structuresRef, {
+            workspace_id: workspaceId,
+            name: s.name,
+            slug: s.slug,
+            color: s.color,
+            created_at: new Date().toISOString()
+          });
+        } catch (e) {
+          handleFirestoreError(e, OperationType.CREATE, 'crm_structures');
+        }
       }
 
-      // Re-fetch ALL structures
-      const allStructsSnap = await getDocs(structuresRef);
+      // Re-fetch structures for this workspace
+      let allStructsSnap;
+      try {
+        allStructsSnap = await getDocs(qStructs);
+      } catch (e) {
+        handleFirestoreError(e, OperationType.LIST, 'crm_structures');
+        return;
+      }
+
       const allStructs = allStructsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMStructure));
 
       for (const struct of allStructs) {
         const stagesRef = collection(db, 'crm_stages');
         const q = query(stagesRef, where('structure_id', '==', struct.id));
-        const stagesSnap = await getDocs(q);
+        let stagesSnap;
+        try {
+          stagesSnap = await getDocs(q);
+        } catch (e) {
+          handleFirestoreError(e, OperationType.LIST, 'crm_stages');
+          continue;
+        }
         
         const stageMap = new Map();
         stagesSnap.docs.forEach(doc => {
           const s = doc.data();
-          if (s.name === 'Modulo preanalisi') {
-            stageMap.set('Form preanalisi', { id: doc.id, ...s });
-          } else {
-            stageMap.set(s.name, { id: doc.id, ...s });
-          }
+          stageMap.set(s.name, { id: doc.id, ...s });
         });
 
         for (const stageDef of CRM_PIPELINE_STAGES) {
           const existing = stageMap.get(stageDef.name);
           if (existing) {
             const updates: any = {};
-            if (existing.name === 'Modulo preanalisi') updates.name = 'Form preanalisi';
             if (existing.position !== stageDef.position) updates.position = stageDef.position;
             if (existing.color !== stageDef.color) updates.color = stageDef.color;
             if (existing.is_won !== stageDef.is_won) updates.is_won = stageDef.is_won;
             if (existing.is_lost !== stageDef.is_lost) updates.is_lost = stageDef.is_lost;
 
             if (Object.keys(updates).length > 0) {
-              await updateDoc(doc(db, 'crm_stages', existing.id), updates);
+              try {
+                await updateDoc(doc(db, 'crm_stages', existing.id), updates);
+              } catch (e) {
+                handleFirestoreError(e, OperationType.UPDATE, `crm_stages/${existing.id}`);
+              }
             }
           } else {
-            await addDoc(stagesRef, {
-              structure_id: struct.id,
-              name: stageDef.name,
-              position: stageDef.position,
-              is_won: stageDef.is_won,
-              is_lost: stageDef.is_lost,
-              color: stageDef.color
-            });
+            try {
+              await addDoc(stagesRef, {
+                structure_id: struct.id,
+                name: stageDef.name,
+                position: stageDef.position,
+                is_won: stageDef.is_won,
+                is_lost: stageDef.is_lost,
+                color: stageDef.color
+              });
+            } catch (e) {
+              handleFirestoreError(e, OperationType.CREATE, 'crm_stages');
+            }
           }
         }
       }
     } catch (error) {
       console.error("CRM Sync failed:", error);
-      throw error;
     }
   },
 
-  async getStructures() {
-    const q = query(collection(db, 'crm_structures'), orderBy('name'));
+  async getStructures(workspaceId?: string) {
+    let q = query(collection(db, 'crm_structures'), orderBy('name'));
+    if (workspaceId) {
+      q = query(collection(db, 'crm_structures'), where('workspace_id', '==', workspaceId), orderBy('name'));
+    }
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMStructure));
   },
@@ -304,11 +528,29 @@ export const supabaseCRMService = {
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMStage));
   },
 
-  async getDeals(structureId?: string) {
+  async getDeals(structureId?: string, workspaceId?: string, filters?: any) {
     let q = query(collection(db, 'crm_deals'), orderBy('created_at', 'desc'));
-    if (structureId) {
-      q = query(collection(db, 'crm_deals'), where('structure_id', '==', structureId), orderBy('created_at', 'desc'));
+    
+    const conditions = [];
+    if (workspaceId) conditions.push(where('workspace_id', '==', workspaceId));
+    if (structureId) conditions.push(where('structure_id', '==', structureId));
+    
+    // Filtri aggiuntivi da applicare lato server se presenti
+    if (filters) {
+      if (filters.owner && filters.owner.length > 0) {
+        conditions.push(where('assigned_to', 'in', filters.owner));
+      }
+      if (filters.stage && filters.stage.length > 0) {
+        conditions.push(where('stage_id', 'in', filters.stage));
+      }
+      // Firestore limita le query 'in' a 10 elementi. 
+      // Se sono di più, converrebbe gestirli diversamente o filtrarli in memoria.
     }
+
+    if (conditions.length > 0) {
+      q = query(collection(db, 'crm_deals'), ...conditions, orderBy('created_at', 'desc'));
+    }
+    
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMDeal));
   },
@@ -358,7 +600,7 @@ export const supabaseCRMService = {
         }
       });
 
-      await this.triggerAutomations(deal, stageData.name);
+      await this.triggerAutomations(deal, 'stage_changed');
     }
 
     return deal;
@@ -389,80 +631,171 @@ export const supabaseCRMService = {
       }
     });
 
+    await this.triggerAutomations(data, 'deal_created');
+
     return data;
   },
 
   async updateDeal(dealId: string, updates: Partial<CRMDeal>) {
     const dealRef = doc(db, 'crm_deals', dealId);
-    await updateDoc(dealRef, { ...updates, updated_at: new Date().toISOString() });
     const snap = await getDoc(dealRef);
-    return { id: snap.id, ...snap.data() } as CRMDeal;
+    const currentDeal = snap.exists() ? { id: snap.id, ...snap.data() } as CRMDeal : null;
+
+    if (updates.preanalysis_result && currentDeal) {
+      const tempDeal = { ...currentDeal, ...updates };
+      const newScore = await this.calculateLeadScore(tempDeal);
+      updates.preanalysis_result.score = newScore;
+      
+      if (newScore !== (currentDeal.preanalysis_result?.score || 0)) {
+        // Trigger score-based automations
+        await this.triggerAutomations(tempDeal, 'field_updated', { field: 'score', value: newScore });
+      }
+    }
+
+    await updateDoc(dealRef, { ...updates, updated_at: new Date().toISOString() });
+    const updatedSnap = await getDoc(dealRef);
+    return { id: updatedSnap.id, ...updatedSnap.data() } as CRMDeal;
   },
 
-  async triggerAutomations(deal: CRMDeal, stageName: string) {
-    const autoUpdates: Partial<CRMDeal> = {};
-    let shouldUpdateDeal = false;
+  async calculateLeadScore(deal: CRMDeal): Promise<number> {
+    let score = 0;
+    const pre = deal.preanalysis_result;
+    
+    if (!pre) return 0;
 
-    if (stageName === 'Form preanalisi' && (!deal.assigned_to || deal.assigned_to === 'Support Team')) {
-      autoUpdates.assigned_to = 'user-1'; 
-      autoUpdates.team = 'Sales Team';
-      shouldUpdateDeal = true;
-      await this.addActivity(deal.id, 'system', '🤖 Assegnazione Automatica', 'Affare assegnato a Marco Rossini (Commerciale) per primo contatto.');
+    // 1. Budget Scoring (30 points max)
+    if (pre.budget >= 100000) score += 30;
+    else if (pre.budget >= 50000) score += 20;
+    else if (pre.budget >= 10000) score += 10;
+    else if (pre.budget > 0) score += 5;
+
+    // 2. Industry (Settore) Scoring (15 points max)
+    const hotIndustries = ['Tecnologia', 'Finanza', 'Energia', 'Healthcare'];
+    if (pre.company_data?.industry && hotIndustries.includes(pre.company_data.industry)) {
+      score += 15;
+    } else if (pre.company_data?.industry) {
+      score += 5;
     }
 
-    if (shouldUpdateDeal) {
-      await this.updateDeal(deal.id, autoUpdates);
+    // 3. Company Size (15 points max)
+    if (pre.company_data?.size) {
+      const sizeStr = pre.company_data.size.toLowerCase();
+      if (sizeStr.includes('500') || sizeStr.includes('1000')) score += 15;
+      else if (sizeStr.includes('50') || sizeStr.includes('200')) score += 10;
+      else score += 5;
     }
 
+    // 4. Request Type / Service (20 points max)
+    const premiumServices = ['Sviluppo Software', 'Consulenza Strategica', 'AI Integration'];
+    if (pre.service_requested && premiumServices.includes(pre.service_requested)) {
+      score += 20;
+    } else if (pre.service_requested) {
+      score += 10;
+    }
+
+    // 5. Pre-analysis Auto-notes / Answers quality (20 points max)
+    // Here we can use auto_notes as a proxy for positive signals detected during form submission
+    if (pre.auto_notes && pre.auto_notes.length > 3) score += 20;
+    else if (pre.auto_notes && pre.auto_notes.length > 0) score += 10;
+
+    return Math.min(100, score);
+  },
+
+  async triggerAutomations(deal: CRMDeal, triggerType: string, extraData?: any) {
     try {
-      const dynamicAutos = await this.getAutomations(deal.stage_id);
-      for (const auto of dynamicAutos) {
-        if (!auto.is_active) continue;
+      const q = query(
+        collection(db, 'crm_automations'), 
+        where('pipeline_id', '==', deal.structure_id),
+        where('is_active', '==', true)
+      );
+      const snap = await getDocs(q);
+      const allAutos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMAutomation));
 
-        switch (auto.type) {
-          case 'task':
-            await this.saveTask({
-              title: auto.config.title || 'Nuovo Task',
-              description: auto.config.description || 'Task generato automaticamente dal workflow.',
-              status: 'todo',
-              priority: 'medium',
-              related_to_id: deal.id,
-              related_to_type: 'deal',
-              related_to_name: deal.title,
-              assigned_to: deal.assigned_to
-            });
-            break;
-          case 'notification':
-            await this.sendCRMNotification({
-              type: 'system_alert',
-              title: '🤖 Automazione',
-              description: auto.config.message || 'Nuova notifica automatica',
-              dealId: deal.id,
-              dealTitle: deal.title,
-              userId: deal.assigned_to
-            });
-            break;
-          case 'note':
-            await this.addActivity(deal.id, 'note', 'Nota Automatica', auto.config.body || 'Nota generata dal sistema.');
-            break;
-          case 'assignee':
-            if (auto.config.assignee_id) {
-               await this.updateDeal(deal.id, { assigned_to: auto.config.assignee_id });
-            }
-            break;
-          case 'whatsapp':
-            if (auto.config.body && deal.phone) {
-              await whatsappService.sendMessage({
-                dealId: deal.id,
-                recipientPhone: deal.phone,
-                content: auto.config.body.replace('{{contact}}', deal.contact).replace('{{deal}}', deal.title)
+      // Filter by trigger type and stage_id if applicable
+      const relevantAutos = allAutos.filter(auto => {
+        if (auto.trigger.type !== triggerType) return false;
+        
+        if (triggerType === 'stage_changed' && auto.stage_id !== deal.stage_id) return false;
+        
+        // Handle special conditions for field_updated if it's the score
+        if (triggerType === 'field_updated' && extraData?.field === 'score') {
+          const condition = auto.trigger.config?.condition;
+          const threshold = auto.trigger.config?.threshold;
+          const currentScore = deal.preanalysis_result?.score || 0;
+
+          if (condition === 'greater_than' && currentScore <= threshold) return false;
+          if (condition === 'less_than' && currentScore >= threshold) return false;
+        }
+
+        return true;
+      });
+
+      for (const auto of relevantAutos) {
+        // Process actions sequence
+        for (const action of auto.actions) {
+          switch (action.type) {
+            case 'task':
+              await this.saveTask({
+                title: action.config.title || 'Nuovo Task',
+                description: action.config.description || 'Task generato automaticamente dal workflow.',
+                status: 'todo',
+                priority: 'medium',
+                related_to_id: deal.id,
+                related_to_type: 'deal',
+                related_to_name: deal.title,
+                assigned_to: deal.assigned_to
               });
-            }
-            break;
+              break;
+            case 'notification':
+              await this.sendCRMNotification({
+                type: 'system_alert',
+                title: '🤖 Automazione',
+                description: action.config.message || 'Nuova notifica automatica',
+                dealId: deal.id,
+                dealTitle: deal.title,
+                userId: deal.assigned_to
+              });
+              break;
+            case 'note':
+              await this.addActivity(deal.id, 'note', 'Nota Automatica', action.config.body || 'Nota generata dal sistema.');
+              break;
+            case 'assignee':
+              if (action.config.assignee_id) {
+                 await this.updateDeal(deal.id, { assigned_to: action.config.assignee_id });
+              }
+              break;
+            case 'whatsapp':
+              if (action.config.body && deal.phone) {
+                await whatsappService.sendMessage({
+                  dealId: deal.id,
+                  recipientPhone: deal.phone,
+                  content: action.config.body.replace('{{contact}}', deal.contact).replace('{{deal}}', deal.title)
+                });
+              }
+              break;
+            case 'email':
+              // Logic for email sending (mock or real)
+              await this.addActivity(deal.id, 'system', '📧 Email Inviata', `Auto-email inviata a ${deal.email}: ${action.config.subject}`);
+              break;
+            case 'webhook':
+              // Logic for webhook call
+              console.log("Triggering webhook:", action.config.url);
+              break;
+            case 'wait':
+              // We can't really "wait" in a synchronous trigger function unless using a queue/worker.
+              // For now, we'll log it. In a real system, this would schedule a future task.
+              console.log(`Automation waiting ${action.config.wait_duration} ${action.config.wait_unit}`);
+              break;
+            case 'change_stage':
+              if (action.config.stage_id) {
+                await this.updateDeal(deal.id, { stage_id: action.config.stage_id });
+              }
+              break;
+          }
         }
       }
     } catch (e) {
-      console.warn("Dynamic automations failed:", e);
+      console.warn("Automations execution failed:", e);
     }
   },
 
@@ -536,10 +869,12 @@ export const supabaseCRMService = {
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   },
 
-  async getStructureActivities(structureId: string) {
+  async getStructureActivities(structureId: string, workspaceId?: string) {
+    if (!workspaceId) return [];
+
     // In Firestore we can't do a real inner join easily. 
     // We'll fetch deals first, then activities for those deals.
-    const dealsQ = query(collection(db, 'crm_deals'), where('structure_id', '==', structureId));
+    const dealsQ = query(collection(db, 'crm_deals'), where('workspace_id', '==', workspaceId), where('structure_id', '==', structureId));
     const dealsSnap = await getDocs(dealsQ);
     const dealIds = dealsSnap.docs.map(doc => doc.id);
     
@@ -644,6 +979,7 @@ export const supabaseCRMService = {
     });
 
     const dealRef = await addDoc(collection(db, 'crm_deals'), {
+      workspace_id: struct.workspace_id || 'system',
       structure_id: struct.id,
       stage_id: stageId,
       title: `Lead Google Form: ${payload.company}`,
@@ -699,22 +1035,30 @@ export const supabaseCRMService = {
     return deal;
   },
 
-  async getAutomations(stageId: string) {
-    const q = query(collection(db, 'crm_automations'), where('stage_id', '==', stageId), orderBy('created_at'));
+  async getAutomations(pipelineId: string, stageId?: string) {
+    let q = query(collection(db, 'crm_automations'), where('pipeline_id', '==', pipelineId), orderBy('created_at'));
+    if (stageId) {
+      q = query(collection(db, 'crm_automations'), where('pipeline_id', '==', pipelineId), where('stage_id', '==', stageId), orderBy('created_at'));
+    }
     const snap = await getDocs(q);
     return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMAutomation));
   },
 
   async saveAutomation(automation: Partial<CRMAutomation>) {
     const { id, ...saveData } = automation;
+    const payload = {
+      ...saveData,
+      updated_at: new Date().toISOString()
+    };
+
     if (id) {
        const docRef = doc(db, 'crm_automations', id);
-       await updateDoc(docRef, saveData);
+       await updateDoc(docRef, payload);
        const snap = await getDoc(docRef);
        return { id: snap.id, ...snap.data() } as CRMAutomation;
     } else {
        const docRef = await addDoc(collection(db, 'crm_automations'), {
-         ...saveData,
+         ...payload,
          created_at: new Date().toISOString()
        });
        const snap = await getDoc(docRef);
@@ -752,12 +1096,13 @@ export const supabaseCRMService = {
     await deleteDoc(doc(db, 'crm_field_definitions', id));
   },
 
-  async searchGlobalDeals(queryString: string) {
-    if (!queryString || queryString.length < 2) return [];
+  async searchGlobalDeals(queryString: string, workspaceId?: string) {
+    if (!queryString || queryString.length < 2 || !workspaceId) return [];
 
     // Firestore doesn't support complex full-text search with ilike.
     // We'll fetch some and filter in memory for this demo.
-    const snap = await getDocs(collection(db, 'crm_deals'));
+    const q = query(collection(db, 'crm_deals'), where('workspace_id', '==', workspaceId));
+    const snap = await getDocs(q);
     const allDeals = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
     
     const lowerQuery = queryString.toLowerCase();
@@ -774,6 +1119,68 @@ export const supabaseCRMService = {
 
   async deleteDeal(id: string) {
     await deleteDoc(doc(db, 'crm_deals', id));
+  },
+
+  // CONTACTS
+  async getContacts(workspaceId?: string) {
+    let q = query(collection(db, 'crm_contacts'), orderBy('name', 'asc'));
+    if (workspaceId) {
+      q = query(collection(db, 'crm_contacts'), where('workspace_id', '==', workspaceId), orderBy('name', 'asc'));
+    }
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMContact));
+  },
+
+  async saveContact(contact: Partial<CRMContact>) {
+    const { id, ...data } = contact;
+    const payload = {
+      ...data,
+      updated_at: new Date().toISOString(),
+      ...(id ? {} : { created_at: new Date().toISOString() })
+    };
+
+    if (id) {
+      await updateDoc(doc(db, 'crm_contacts', id), payload);
+      return { id, ...payload } as CRMContact;
+    } else {
+      const docRef = await addDoc(collection(db, 'crm_contacts'), payload);
+      return { id: docRef.id, ...payload } as CRMContact;
+    }
+  },
+
+  async deleteContact(id: string) {
+    await deleteDoc(doc(db, 'crm_contacts', id));
+  },
+
+  // COMPANIES
+  async getCompanies(workspaceId?: string) {
+    let q = query(collection(db, 'crm_companies'), orderBy('name', 'asc'));
+    if (workspaceId) {
+      q = query(collection(db, 'crm_companies'), where('workspace_id', '==', workspaceId), orderBy('name', 'asc'));
+    }
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMCompany));
+  },
+
+  async saveCompany(company: Partial<CRMCompany>) {
+    const { id, ...data } = company;
+    const payload = {
+      ...data,
+      updated_at: new Date().toISOString(),
+      ...(id ? {} : { created_at: new Date().toISOString() })
+    };
+
+    if (id) {
+      await updateDoc(doc(db, 'crm_companies', id), payload);
+      return { id, ...payload } as CRMCompany;
+    } else {
+      const docRef = await addDoc(collection(db, 'crm_companies'), payload);
+      return { id: docRef.id, ...payload } as CRMCompany;
+    }
+  },
+
+  async deleteCompany(id: string) {
+    await deleteDoc(doc(db, 'crm_companies', id));
   },
 
   // SMART PROCESSES

@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
 import { motion } from 'motion/react';
 
 export const CRMHeaderKPIs: React.FC = () => {
-  const { deals, stages } = useCRMStore();
+  const { getFilteredDeals, stages } = useCRMStore();
+  const deals = getFilteredDeals();
 
   const kpis = useMemo(() => {
     // Determine won/lost stages

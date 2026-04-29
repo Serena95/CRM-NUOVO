@@ -126,6 +126,20 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
     borderLeftColor: structure?.color || '#cbd5e1'
   };
 
+  const getScoreBadgeStyles = (score: number) => {
+    if (score >= 80) return "bg-rose-100 text-rose-700 border-rose-200 ring-rose-500/20";
+    if (score >= 60) return "bg-orange-100 text-orange-700 border-orange-200 ring-orange-500/20";
+    if (score >= 30) return "bg-amber-100 text-amber-700 border-amber-200 ring-amber-500/20";
+    return "bg-slate-100 text-slate-600 border-slate-200 ring-slate-500/10";
+  };
+
+  const getScoreLabel = (score: number) => {
+    if (score >= 80) return "HOT 🔥";
+    if (score >= 60) return "CALDO";
+    if (score >= 30) return "MEDIO";
+    return "FREDDO";
+  };
+
   const getBadgeColor = () => {
     const s = stageName.toLowerCase();
     if (s.includes('vinto')) return "bg-emerald-50 text-emerald-600";
@@ -166,8 +180,12 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
               </Badge>
             )}
           </div>
-          <Badge className={cn("text-[9px] xl:text-[10px] font-black uppercase px-2 py-0.5 border-none shadow-none shrink-0", getBadgeColor())}>
-            {res.score}%
+          <Badge className={cn(
+            "text-[8px] xl:text-[10px] font-black uppercase px-2 py-0.5 border ring-1 shrink-0 flex items-center gap-1", 
+            getScoreBadgeStyles(res.score)
+          )}>
+            <span className="hidden xl:inline">{getScoreLabel(res.score)}</span>
+            <span>{res.score}%</span>
           </Badge>
         </div>
 
@@ -241,7 +259,10 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
         </div>
 
         {deal.preanalysis_result && (
-          <Badge className={cn("xl:hidden text-[9px] font-black uppercase px-1.5 py-0 border-none shadow-none", getBadgeColor())}>
+          <Badge className={cn(
+            "xl:hidden text-[8px] font-black uppercase px-1.5 py-0 border ring-1", 
+            getScoreBadgeStyles(deal.preanalysis_result.score)
+          )}>
             {deal.preanalysis_result.score}%
           </Badge>
         )}
@@ -292,7 +313,12 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
         <div className="flex items-center gap-2">
           {/* Desktop specific: High score badge at bottom if exists */}
           {deal.preanalysis_result && (
-            <Badge className={cn("hidden xl:flex text-[10px] font-black uppercase px-1.5 py-0 border-none shadow-none h-5", getBadgeColor())}>
+            <Badge className={cn(
+              "hidden xl:flex text-[10px] font-black uppercase px-2 py-0 border ring-1 h-5 items-center gap-2", 
+              getScoreBadgeStyles(deal.preanalysis_result.score)
+            )}>
+              {getScoreLabel(deal.preanalysis_result.score)}
+              <span className="opacity-50">•</span>
               {deal.preanalysis_result.score}%
             </Badge>
           )}

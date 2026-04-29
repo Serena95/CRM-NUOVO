@@ -81,28 +81,24 @@ const StatWidget = ({
 );
 
 const CommercialDashboard: React.FC<{ setActiveTab: (tab: string) => void }> = ({ setActiveTab }) => {
-  const { setFilters, resetFilters } = useCRMStore();
-  const [deals, setDeals] = useState<CRMDeal[]>([]);
-  const [stages, setStages] = useState<CRMStage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { setFilters, resetFilters, deals, stages, isLoading: isStoreLoading, activeWorkspace } = useCRMStore();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [dealsData, stagesData] = await Promise.all([
-          supabaseCRMService.getDeals(),
-          supabaseCRMService.getStages()
-        ]);
-        setDeals(dealsData);
-        setStages(stagesData);
-      } catch (error) {
-        console.error('Errore nel caricamento dati dashboard:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+  const handleNavigateCRM = (filter?: string) => {
+    resetFilters();
+    if (filter === 'active') {
+      setFilters({ status: ['attivo'] });
+    } else if (filter === 'won') {
+      setFilters({ status: ['vinto'] });
+    } else if (filter === 'lost') {
+      setFilters({ status: ['perso'] });
+    } else if (filter === 'new') {
+      const from = new Date();
+      from.setDate(1);
+      from.setHours(0, 0, 0, 0);
+      setFilters({ dateFrom: from });
+    }
+    setActiveTab('affari');
+  };
 
   // Calcoli per i Widget
   const stats = useMemo(() => {
@@ -157,24 +153,7 @@ const CommercialDashboard: React.FC<{ setActiveTab: (tab: string) => void }> = (
 
   const COLORS = ['#2FC6F6', '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-  const handleNavigateCRM = (filter?: string) => {
-    resetFilters();
-    if (filter === 'active') {
-      setFilters({ stato: ['attivo'] });
-    } else if (filter === 'won') {
-      setFilters({ stato: ['vinto'] });
-    } else if (filter === 'lost') {
-      setFilters({ stato: ['perso'] });
-    } else if (filter === 'new') {
-      const from = new Date();
-      from.setDate(1);
-      from.setHours(0, 0, 0, 0);
-      setFilters({ dataCreazione: { from } });
-    }
-    setActiveTab('affari');
-  };
-
-  if (isLoading) {
+  if (isStoreLoading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#f8fafc]">
         <div className="flex flex-col items-center gap-4">
@@ -183,6 +162,27 @@ const CommercialDashboard: React.FC<{ setActiveTab: (tab: string) => void }> = (
         </div>
       </div>
     );
+  }
+
+  if (!deals || deals.length === 0) {
+     return (
+       <div className="flex-1 flex flex-col items-center justify-center bg-[#f8fafc] p-8 text-center">
+          <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center text-slate-300 mb-6">
+            <LayoutDashboard size={40} />
+          </div>
+          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">Nessun dato disponibile</h2>
+          <p className="text-sm text-slate-500 max-w-md mx-auto mb-8 font-medium">
+            Non ci sono ancora affari nel workspace <span className="text-blue-600 font-bold">{activeWorkspace?.name}</span>. 
+            Inizia creando il tuo primo affare nel CRM.
+          </p>
+          <button 
+            onClick={() => setActiveTab('affari')}
+            className="px-8 h-12 rounded-2xl bg-blue-600 text-white text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-200"
+          >
+            Vai al CRM
+          </button>
+       </div>
+     );
   }
 
   return (

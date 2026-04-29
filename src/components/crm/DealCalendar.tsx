@@ -32,20 +32,20 @@ import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const DealCalendar: React.FC = () => {
-  const { activeStructure } = useCRMStore();
+  const { activeStructure, activeWorkspace } = useCRMStore();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!activeStructure) return;
+    if (!activeStructure || !activeWorkspace) return;
     
     setLoading(true);
-    supabaseCRMService.getStructureActivities(activeStructure.id)
+    supabaseCRMService.getStructureActivities(activeStructure.id, activeWorkspace.id)
       .then(data => setActivities(data || []))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [activeStructure]);
+  }, [activeStructure, activeWorkspace?.id]);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);

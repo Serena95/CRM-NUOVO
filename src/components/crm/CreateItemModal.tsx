@@ -32,11 +32,12 @@ interface CreateItemModalProps {
   type: 'lead' | 'deal' | 'contact' | 'company';
   pipelineId?: string;
   stageId?: string;
+  initialData?: any;
 }
 
-export const CreateItemModal: React.FC<CreateItemModalProps> = ({ isOpen, onClose, type, pipelineId: propPipelineId, stageId: propStageId }) => {
+export const CreateItemModal: React.FC<CreateItemModalProps> = ({ isOpen, onClose, type, pipelineId: propPipelineId, stageId: propStageId, initialData }) => {
   const { user } = useAuth();
-  const { structures, activeStructure, fetchInitialData, stages: allStages } = useCRMStore();
+  const { structures, activeStructure, activeWorkspace, fetchInitialData, stages: allStages } = useCRMStore();
   const [loading, setLoading] = useState(false);
   
   const [selectedPipelineId, setSelectedPipelineId] = useState(propPipelineId || activeStructure?.id || '');
@@ -50,8 +51,16 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({ isOpen, onClos
     phone: '',
     value: 0,
     assigned_to: 'user-1', // Default to first user (Marco Rossini)
-    notes: ''
+    notes: '',
+    ...initialData
   });
+
+  // Handle initialData changes if modal is reopened with new data
+  React.useEffect(() => {
+    if (initialData) {
+      setFormData(prev => ({ ...prev, ...initialData }));
+    }
+  }, [initialData]);
 
   // Filter stages based on selected pipeline
   const filteredStages = useMemo(() => {
@@ -85,6 +94,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({ isOpen, onClos
     try {
       if (type === 'deal') {
         const payload = {
+          workspace_id: activeWorkspace?.id,
           structure_id: selectedPipelineId,
           stage_id: selectedStageId,
           title: formData.company || formData.title,
