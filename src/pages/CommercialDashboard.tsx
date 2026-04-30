@@ -164,26 +164,27 @@ const CommercialDashboard: React.FC<{ setActiveTab: (tab: string) => void }> = (
     );
   }
 
-  if (!deals || deals.length === 0) {
+  if (!stages || stages.length === 0) {
      return (
        <div className="flex-1 flex flex-col items-center justify-center bg-[#f8fafc] p-8 text-center">
-          <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center text-slate-300 mb-6">
-            <LayoutDashboard size={40} />
+          <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center text-slate-300 mb-6 font-black italic">
+            CRM
           </div>
-          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">Nessun dato disponibile</h2>
+          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">Pipeline non configurata</h2>
           <p className="text-sm text-slate-500 max-w-md mx-auto mb-8 font-medium">
-            Non ci sono ancora affari nel workspace <span className="text-blue-600 font-bold">{activeWorkspace?.name}</span>. 
-            Inizia creando il tuo primo affare nel CRM.
+            Non è stata trovata nessuna struttura CRM nel workspace <span className="text-blue-600 font-bold">{activeWorkspace?.name}</span>. 
           </p>
           <button 
             onClick={() => setActiveTab('affari')}
             className="px-8 h-12 rounded-2xl bg-blue-600 text-white text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-200"
           >
-            Vai al CRM
+            Configura CRM
           </button>
        </div>
      );
   }
+
+  const hasDeals = deals && deals.length > 0;
 
   return (
     <div className="flex-1 bg-[#f8fafc] overflow-y-auto no-scrollbar pb-20">
@@ -210,6 +211,31 @@ const CommercialDashboard: React.FC<{ setActiveTab: (tab: string) => void }> = (
       </div>
 
       <div className="max-w-[1600px] mx-auto p-8">
+        {!hasDeals && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-6 bg-blue-600 rounded-[32px] text-white flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative"
+          >
+            <div className="relative z-10">
+              <h2 className="text-2xl font-black uppercase tracking-tight mb-2">Benvenuto nel tuo CRM</h2>
+              <p className="text-blue-100 text-sm font-medium max-w-xl">
+                La tua dashboard è pronta, ma non hai ancora inserito degli affari. 
+                Inizia a popolare la tua pipeline per vedere grafici e statistiche in tempo reale.
+              </p>
+            </div>
+            <button 
+              onClick={() => setActiveTab('affari')}
+              className="relative z-10 px-8 h-12 bg-white text-blue-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-50 transition-all shrink-0 shadow-xl"
+            >
+              Crea Primo Affare
+            </button>
+            {/* Decoration */}
+            <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
+            <div className="absolute left-1/4 bottom-0 w-32 h-32 bg-white/5 rounded-full translate-y-1/2" />
+          </motion.div>
+        )}
+
         {/* Widget Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatWidget 

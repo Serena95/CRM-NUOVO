@@ -1,6 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
-import Layout from '@/components/Layout';
+import AppLayout from '@/layouts/AppLayout';
+import PublicLayout from '@/layouts/PublicLayout';
+import AuthGuard from '@/components/auth/AuthGuard';
+
+// Pages
 import Dashboard from '@/pages/Dashboard';
 import CRM from '@/pages/CRM';
 import Tasks from '@/pages/Tasks';
@@ -18,27 +23,21 @@ import Applications from '@/pages/Applications';
 import Automations from '@/pages/Automations';
 import Analytics from '@/pages/Analytics';
 import Login from '@/pages/Login';
-import LandingPage from '@/pages/LandingPage';
-import BusinessModule from '@/pages/BusinessModule';
-import QuoteModule from '@/pages/QuoteModule';
-import CommercialDashboard from '@/pages/CommercialDashboard';
+import ForgotPassword from '@/pages/ForgotPassword';
+import Invite from '@/pages/Invite';
 import { ClientPortal } from '@/pages/ClientPortal';
+import { SmartCRM } from './pages/SmartCRM';
+import CommercialDashboard from '@/pages/CommercialDashboard';
+
+// Components
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-
-import { SmartProcessManager } from './components/crm/SmartProcessManager';
-import { SmartCRM } from './pages/SmartCRM';
 import { useCRMStore } from '@/stores/crmStore';
 
 const App: React.FC = () => {
   const { user, loading } = useAuth();
   const { fetchInitialData } = useCRMStore();
-  
-  // Client Portal Check
-  const urlParams = new URLSearchParams(window.location.search);
-  const portalToken = urlParams.get('portal');
+  const location = useLocation();
 
   useEffect(() => {
     if (user) {
@@ -46,13 +45,10 @@ const App: React.FC = () => {
     }
   }, [user, fetchInitialData]);
 
-  const [activeTab, setActiveTabValue] = useState(() => {
-    return localStorage.getItem('nexus_active_tab') || 'dashboard-home';
-  });
-  const [showLogin, setShowLogin] = useState(false);
-  const [isSmartProcessManagerOpen, setIsSmartProcessManagerOpen] = useState(false);
+  // Client Portal Check (Keep existing logic or use a route)
+  const urlParams = new URLSearchParams(window.location.search);
+  const portalToken = urlParams.get('portal');
 
-  // If portal token exists, return Portal directly
   if (portalToken) {
     return (
       <>
@@ -61,38 +57,6 @@ const App: React.FC = () => {
       </>
     );
   }
-
-  const setActiveTab = (tab: string) => {
-    if (tab === 'crm-new-process') {
-      setIsSmartProcessManagerOpen(true);
-      return;
-    }
-    setActiveTabValue(tab);
-  };
-
-  useEffect(() => {
-    localStorage.setItem('nexus_active_tab', activeTab);
-  }, [activeTab]);
-
-  useEffect(() => {
-    const handleOpenDeal = (e: any) => {
-      const { dealId } = e.detail;
-      if (dealId) {
-        // We set the active tab to 'affari' and since CRM will receive it
-        // it should handle showing the specific deal if we pass it via some state or global store
-        // For now, switching to 'affari' is a good step. 
-        // A better way would be using a store to track the "selectedDealId".
-        setActiveTab('affari');
-        // Small delay to ensure the CRM page is mounted
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('crm:showDeal', { detail: { dealId } }));
-        }, 100);
-      }
-    };
-
-    window.addEventListener('crm:openDealGlobal', handleOpenDeal);
-    return () => window.removeEventListener('crm:openDealGlobal', handleOpenDeal);
-  }, []);
 
   if (loading) {
     return (
@@ -105,162 +69,45 @@ const App: React.FC = () => {
     );
   }
 
-  if (!user) {
-    if (showLogin) {
-      return (
-        <>
-          <Login onBack={() => setShowLogin(false)} />
-          <Toaster position="top-right" />
-        </>
-      );
-    }
-    return <LandingPage onLogin={() => setShowLogin(true)} />;
-  }
-
-  const renderContent = () => {
-    // Handle sub-tabs by mapping them to main modules
-    const mainTab = activeTab.split('-')[0];
-    
-    switch (activeTab) {
-      case 'feed':
-        return <Feed />;
-      case 'dashboard':
-      case 'dashboard-home':
-      case 'dashboard-kpi':
-      case 'dashboard-recent':
-      case 'dashboard-pipeline':
-        return <Dashboard activeTab={activeTab} />;
-      case 'crm-dashboard':
-        return <CommercialDashboard setActiveTab={setActiveTab} />;
-      case 'leads':
-      case 'affari':
-      case 'deals': // backward compatibility
-      case 'contacts':
-      case 'companies':
-      case 'contatti':
-      case 'aziende':
-      case 'calendario':
-      case 'automazioni':
-      case 'configurazione':
-      case 'activities':
-      case 'pipelines':
-      case 'pipeline-settings':
-      case 'quotes':
-      case 'invoices':
-      case 'crm':
-      case 'preventivi':
-      case 'ai-agente':
-        return <CRM activeTab={activeTab} setActiveTab={setActiveTab} />;
-      case 'tasks':
-      case 'tasks-my':
-      case 'tasks-all':
-      case 'tasks-kanban':
-      case 'tasks-gantt':
-        return <Tasks activeTab={activeTab} />;
-      case 'chat':
-      case 'chat-private':
-      case 'chat-group':
-      case 'chat-channels':
-      case 'chat-video':
-      case 'chat-voip':
-        return <Chat />;
-      case 'calendar':
-      case 'calendar-personal':
-      case 'calendar-team':
-      case 'calendar-events':
-        return <Calendar />;
-      case 'docs':
-      case 'docs-manager':
-      case 'docs-folders':
-      case 'docs-sharing':
-        return <Docs />;
-      case 'drive':
-      case 'drive-personal':
-      case 'drive-team':
-      case 'drive-shared':
-        return <Drive />;
-      case 'mail':
-      case 'mail-inbox':
-      case 'mail-send':
-      case 'mail-templates':
-        return <Webmail />;
-      case 'groups':
-      case 'groups-list':
-      case 'groups-projects':
-        return <Groups />;
-      case 'marketing':
-      case 'marketing-email':
-      case 'marketing-sms':
-      case 'marketing-campaigns':
-      case 'marketing-leads':
-        return <Marketing />;
-      case 'automation':
-      case 'automation-workflow':
-      case 'automation-triggers':
-      case 'automation-robots':
-        return <Automations />;
-      case 'analytics':
-      case 'analytics-dashboard':
-      case 'analytics-sales':
-      case 'analytics-pipeline':
-        return <Analytics />;
-      case 'contact-center':
-      case 'cc-livechat':
-      case 'cc-whatsapp':
-      case 'cc-telegram':
-        return <ContactCenter />;
-      case 'apps':
-      case 'apps-marketplace':
-      case 'apps-integrations':
-        return <Applications />;
-      case 'settings':
-      case 'settings-users':
-      case 'settings-roles':
-      case 'settings-permissions':
-      case 'settings-crm-fields':
-        return <Settings activeTab={activeTab} />;
-      default:
-        if (activeTab.startsWith('smart-process-')) {
-          const slug = activeTab.replace('smart-process-', '');
-          return <SmartCRM activeTab={activeTab} setActiveTab={setActiveTab} slug={slug} />;
-        }
-        if (activeTab.startsWith('pipeline-') || activeTab.startsWith('nexus-')) {
-          return <CRM activeTab={activeTab} setActiveTab={setActiveTab} />;
-        }
-        return (
-          <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-white m-8 rounded-3xl shadow-sm border border-slate-100">
-            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 mb-6">
-              <Plus size={40} className="rotate-45" />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-800">Sezione in Sviluppo</h2>
-            <p className="text-slate-500 max-w-md mt-2">
-              Stiamo lavorando per portare tutte le funzionalità necessarie su questa piattaforma. 
-              La sezione <span className="font-bold text-blue-500 uppercase">"{activeTab}"</span> sarà disponibile a breve.
-            </p>
-            <Button 
-              onClick={() => setActiveTab('feed')}
-              className="mt-8 bg-[#2FC6F6] hover:bg-[#1eb0e0] text-white rounded-full px-8 font-bold"
-            >
-              TORNA ALLA DASHBOARD
-            </Button>
-          </div>
-        );
-    }
-  };
-
   return (
     <TooltipProvider>
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-        {renderContent()}
-      </Layout>
-      {isSmartProcessManagerOpen && (
-        <SmartProcessManager 
-          onClose={() => setIsSmartProcessManagerOpen(false)}
-          onProcessCreated={(p) => {
-            setActiveTab(`smart-process-${p.slug}`);
-          }}
-        />
-      )}
+      <Routes>
+        {/* Public Routes */}
+        <Route element={<PublicLayout />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot" element={<ForgotPassword />} />
+          <Route path="/invite" element={<Invite />} />
+        </Route>
+
+        {/* Private Routes */}
+        <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
+          <Route path="/" element={<Navigate to="/crm/affari" replace />} />
+          <Route path="/dashboard/*" element={<Dashboard activeTab={location.pathname.replace('/', '').replace(/\//g, '-')} />} />
+          <Route path="/crm/dashboard" element={<CommercialDashboard setActiveTab={() => {}} />} />
+          <Route path="/crm/:tab" element={<CRM activeTab={location.pathname.split('/').pop() || 'affari'} setActiveTab={() => {}} />} />
+          <Route path="/crm/smart-process-:slug" element={<SmartCRM activeTab={location.pathname.split('/').pop() || ''} setActiveTab={() => {}} slug={location.pathname.split('-').pop() || ''} />} />
+          <Route path="/feed" element={<Feed />} />
+          <Route path="/tasks/*" element={<Tasks activeTab={location.pathname.replace('/', '').replace(/\//g, '-')} />} />
+          <Route path="/chat/*" element={<Chat />} />
+          <Route path="/calendar/*" element={<Calendar />} />
+          <Route path="/docs/*" element={<Docs />} />
+          <Route path="/drive/*" element={<Drive />} />
+          <Route path="/mail/*" element={<Webmail />} />
+          <Route path="/groups/*" element={<Groups />} />
+          <Route path="/marketing/*" element={<Marketing />} />
+          <Route path="/automation/*" element={<Automations />} />
+          <Route path="/analytics/*" element={<Analytics />} />
+          <Route path="/contact-center/*" element={<ContactCenter />} />
+          <Route path="/apps/*" element={<Applications />} />
+          <Route path="/settings/*" element={<Settings activeTab={location.pathname.replace('/', '').replace(/\//g, '-')} />} />
+          
+          {/* Default redirect for unknown private routes */}
+          <Route path="*" element={<Navigate to="/crm/affari" replace />} />
+        </Route>
+
+        {/* Global Redirects */}
+        <Route path="*" element={<Navigate to={user ? "/crm/affari" : "/login"} replace />} />
+      </Routes>
       <Toaster position="top-right" />
     </TooltipProvider>
   );

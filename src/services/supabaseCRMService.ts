@@ -16,58 +16,13 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { CRMStructure, CRMStage, CRMDeal, CRMFormResult, PreanalysisResult, CRMAutomation, CRMCustomFieldDefinition, SmartProcess, SmartRecord, SmartFieldDefinition, WhatsAppMessage, CRMCalendarEvent, CRMTask, CRMSignature, CRMQuote, CRMProduct, ClientPortalAccess, CRMWorkspace, CRMWorkspaceMember, CRMContact, CRMCompany, CRMActivity } from '@/types/crm';
-import { CRM_STRUCTURES, CRM_PIPELINE_STAGES } from '@/constants/crm';
+import { CRM_STRUCTURES, CRM_PIPELINE_STAGES, LEADS_STAGES } from '@/constants/crm';
 import { notificationService } from './notificationService';
 import { whatsappService } from './whatsappService';
 import { NotificationType } from '@/types/notifications';
 import { supabaseFeedService } from './supabaseFeedService';
 
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-    tenantId?: string | null;
-    providerInfo?: {
-      providerId?: string | null;
-      email?: string | null;
-    }[];
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData?.map(provider => ({
-        providerId: provider.providerId,
-        email: provider.email,
-      })) || []
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
-}
+import { handleFirestoreError, OperationType } from '@/lib/firestore-errors';
 
 export const supabaseCRMService = {
   // Workspaces
@@ -267,26 +222,42 @@ export const supabaseCRMService = {
     status?: string;
     workspaceId?: string;
   }) {
-    let q = query(collection(db, 'crm_deals'), orderBy('created_at', 'desc'));
-    
-    if (filters.workspaceId) {
-      q = query(collection(db, 'crm_deals'), where('workspace_id', '==', filters.workspaceId), orderBy('created_at', 'desc'));
-    }
-    
-    const snap = await getDocs(q);
-    let deals = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMDeal));
+    try {
+      if (!filters.workspaceId) {
+        console.warn("getReportingDeals: No workspaceId provided, skipping query.");
+        return [];
+      }
 
-    if (filters.pipelineId) deals = deals.filter(d => d.structure_id === filters.pipelineId);
-    if (filters.userId) deals = deals.filter(d => d.assigned_to === filters.userId);
-    if (filters.startDate) deals = deals.filter(d => d.created_at >= filters.startDate!);
-    if (filters.endDate) deals = deals.filter(d => d.created_at <= filters.endDate!);
-    if (filters.status) {
-      if (filters.status === 'won') deals = deals.filter(d => d.stage_id.toLowerCase().includes('vinto'));
-      else if (filters.status === 'lost') deals = deals.filter(d => d.stage_id.toLowerCase().includes('perso'));
-      else deals = deals.filter(d => d.stage_id === filters.status);
-    }
+      const q = query(
+        collection(db, 'crm_deals'), 
+        where('workspace_id', '==', filters.workspaceId)
+      );
+      
+      const snap = await getDocs(q);
+      let deals = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMDeal));
 
-    return deals;
+      // In-memory sorting and filtering to avoid missing index errors
+      deals.sort((a, b) => {
+        const dateA = a.created_at || '';
+        const dateB = b.created_at || '';
+        return dateB.localeCompare(dateA); // Descending
+      });
+
+      if (filters.pipelineId) deals = deals.filter(d => d.structure_id === filters.pipelineId);
+      if (filters.userId) deals = deals.filter(d => d.assigned_to === filters.userId);
+      if (filters.startDate) deals = deals.filter(d => d.created_at >= filters.startDate!);
+      if (filters.endDate) deals = deals.filter(d => d.created_at <= filters.endDate!);
+      if (filters.status) {
+        if (filters.status === 'won') deals = deals.filter(d => d.stage_id?.toLowerCase().includes('vinto'));
+        else if (filters.status === 'lost') deals = deals.filter(d => d.stage_id?.toLowerCase().includes('perso'));
+        else deals = deals.filter(d => d.stage_id === filters.status);
+      }
+
+      return deals;
+    } catch (e) {
+      handleFirestoreError(e, OperationType.LIST, 'crm_deals/reporting');
+      return [];
+    }
   },
 
   // Signatures
@@ -473,7 +444,9 @@ export const supabaseCRMService = {
           stageMap.set(s.name, { id: doc.id, ...s });
         });
 
-        for (const stageDef of CRM_PIPELINE_STAGES) {
+        const allStages = struct.slug === 'leads' ? LEADS_STAGES : CRM_PIPELINE_STAGES;
+
+        for (const stageDef of allStages) {
           const existing = stageMap.get(stageDef.name);
           if (existing) {
             const updates: any = {};
@@ -705,6 +678,7 @@ export const supabaseCRMService = {
     try {
       const q = query(
         collection(db, 'crm_automations'), 
+        where('workspace_id', '==', deal.workspace_id),
         where('pipeline_id', '==', deal.structure_id),
         where('is_active', '==', true)
       );
@@ -1035,34 +1009,54 @@ export const supabaseCRMService = {
     return deal;
   },
 
-  async getAutomations(pipelineId: string, stageId?: string) {
-    let q = query(collection(db, 'crm_automations'), where('pipeline_id', '==', pipelineId), orderBy('created_at'));
-    if (stageId) {
-      q = query(collection(db, 'crm_automations'), where('pipeline_id', '==', pipelineId), where('stage_id', '==', stageId), orderBy('created_at'));
+  async getAutomations(pipelineId: string, workspaceId: string, stageId?: string) {
+    try {
+      let q = query(
+        collection(db, 'crm_automations'), 
+        where('workspace_id', '==', workspaceId),
+        where('pipeline_id', '==', pipelineId)
+      );
+      if (stageId) {
+        q = query(
+          collection(db, 'crm_automations'), 
+          where('workspace_id', '==', workspaceId),
+          where('pipeline_id', '==', pipelineId), 
+          where('stage_id', '==', stageId)
+        );
+      }
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMAutomation));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.GET, 'crm_automations');
+      throw e;
     }
-    const snap = await getDocs(q);
-    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CRMAutomation));
   },
 
-  async saveAutomation(automation: Partial<CRMAutomation>) {
+  async saveAutomation(automation: Partial<CRMAutomation>, workspaceId: string) {
     const { id, ...saveData } = automation;
     const payload = {
       ...saveData,
+      workspace_id: workspaceId,
       updated_at: new Date().toISOString()
     };
 
-    if (id) {
-       const docRef = doc(db, 'crm_automations', id);
-       await updateDoc(docRef, payload);
-       const snap = await getDoc(docRef);
-       return { id: snap.id, ...snap.data() } as CRMAutomation;
-    } else {
-       const docRef = await addDoc(collection(db, 'crm_automations'), {
-         ...payload,
-         created_at: new Date().toISOString()
-       });
-       const snap = await getDoc(docRef);
-       return { id: snap.id, ...snap.data() } as CRMAutomation;
+    try {
+      if (id) {
+         const docRef = doc(db, 'crm_automations', id);
+         await updateDoc(docRef, payload);
+         const snap = await getDoc(docRef);
+         return { id: snap.id, ...snap.data() } as CRMAutomation;
+      } else {
+         const docRef = await addDoc(collection(db, 'crm_automations'), {
+           ...payload,
+           created_at: new Date().toISOString()
+         });
+         const snap = await getDoc(docRef);
+         return { id: snap.id, ...snap.data() } as CRMAutomation;
+      }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, id ? `crm_automations/${id}` : 'crm_automations');
+      throw e;
     }
   },
 
@@ -1249,6 +1243,35 @@ export const supabaseCRMService = {
 
   async deleteSmartRecord(id: string) {
     await deleteDoc(doc(db, 'smart_records', id));
+  },
+
+  async convertLeadToDeal(leadId: string, targetPipelineId: string) {
+    const dealRef = doc(db, 'crm_deals', leadId);
+    
+    // Fetch target pipeline's first stage
+    const stagesRef = collection(db, 'crm_stages');
+    const q = query(stagesRef, where('structure_id', '==', targetPipelineId), orderBy('position'));
+    const stagesSnap = await getDocs(q);
+    
+    if (stagesSnap.empty) throw new Error("No stages found for target pipeline");
+    const firstStageId = stagesSnap.docs[0].id;
+    
+    await updateDoc(dealRef, {
+      structure_id: targetPipelineId,
+      stage_id: firstStageId,
+      updated_at: new Date().toISOString()
+    });
+    
+    const currentUser = auth.currentUser;
+    await supabaseFeedService.logCRMActivity({
+      type: 'deal_won',
+      dealId: leadId,
+      dealTitle: 'Conversione Lead',
+      content: `Lead convertito con successo in Affare nella pipeline selezionata.`,
+      authorId: currentUser?.uid || 'system',
+      authorName: currentUser?.displayName || 'Sistema',
+      authorPhoto: currentUser?.photoURL || undefined
+    });
   }
 };
 

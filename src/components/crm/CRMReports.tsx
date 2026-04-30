@@ -82,58 +82,76 @@ export const CRMReports: React.FC<CRMReportsProps> = ({ pipeline }) => {
 
   // CALCOLO METRICHE
   const stats = useMemo(() => {
+    if (!deals.length) {
+      return { total: 0, won: 0, lost: 0, closed: 0, conversionRate: 0, pipelineValue: 0, avgClosingTime: 0 };
+    }
     const total = deals.length;
-    const won = deals.filter(d => d.stage_id.toLowerCase().includes('vinto')).length;
-    const lost = deals.filter(d => d.stage_id.toLowerCase().includes('perso')).length;
+    const won = deals.filter(d => d.stage_id?.toLowerCase().includes('vinto')).length;
+    const lost = deals.filter(d => d.stage_id?.toLowerCase().includes('perso')).length;
     const closed = won + lost;
     
     const conversionRate = closed > 0 ? (won / closed) * 100 : 0;
     const pipelineValue = deals.reduce((acc, d) => acc + (d.value || 0), 0);
     
-    const avgClosingTime = deals
-      .filter(d => d.stage_id.toLowerCase().includes('vinto') || d.stage_id.toLowerCase().includes('perso'))
-      .reduce((acc, d) => {
+    const closedDeals = deals.filter(d => d.stage_id?.toLowerCase().includes('vinto') || d.stage_id?.toLowerCase().includes('perso'));
+    const validClosedDeals = closedDeals.filter(d => d.created_at && d.updated_at);
+    
+    const totalClosingDays = validClosedDeals.reduce((acc, d) => {
+      try {
         const start = parseISO(d.created_at);
         const end = parseISO(d.updated_at);
-        return acc + differenceInDays(end, start);
-      }, 0) / (closed || 1);
+        const days = differenceInDays(end, start);
+        return acc + (isNaN(days) ? 0 : days);
+      } catch (e) {
+        return acc;
+      }
+    }, 0);
+
+    const avgClosingTime = validClosedDeals.length > 0 ? totalClosingDays / validClosedDeals.length : 0;
 
     return { total, won, lost, closed, conversionRate, pipelineValue, avgClosingTime };
   }, [deals]);
 
   // DATI GRAFICI
   const monthlyData = useMemo(() => {
+    if (!deals.length) return [];
     const months: Record<string, any> = {};
     deals.forEach(d => {
-      const month = format(parseISO(d.created_at), 'MMM yy', { locale: it });
-      if (!months[month]) months[month] = { name: month, total: 0, won: 0, value: 0 };
-      months[month].total += 1;
-      months[month].value += (d.value || 0);
-      if (d.stage_id.toLowerCase().includes('vinto')) months[month].won += 1;
+      try {
+        const month = format(parseISO(d.created_at), 'MMM yy', { locale: it });
+        if (!months[month]) months[month] = { name: month, total: 0, won: 0, value: 0 };
+        months[month].total += 1;
+        months[month].value += (d.value || 0);
+        if (d.stage_id?.toLowerCase().includes('vinto')) months[month].won += 1;
+      } catch (e) {
+        console.warn("Invalid date in deal:", d);
+      }
     });
     return Object.values(months);
   }, [deals]);
 
-  const salesPersonData = useMemo(() => {
+   const salesPersonData = useMemo(() => {
+    if (!deals.length) return [];
     const sales: Record<string, any> = {};
     deals.forEach(d => {
       const user = d.assigned_to || 'Non Assegnato';
       if (!sales[user]) sales[user] = { name: user, total: 0, won: 0, value: 0 };
       sales[user].total += 1;
       sales[user].value += (d.value || 0);
-      if (d.stage_id.toLowerCase().includes('vinto')) sales[user].won += 1;
+      if (d.stage_id?.toLowerCase().includes('vinto')) sales[user].won += 1;
     });
-    return Object.values(sales).sort((a, b) => b.value - a.value);
+    return Object.values(sales).sort((a: any, b: any) => b.value - a.value);
   }, [deals]);
 
   const stageDistribution = useMemo(() => {
-    const stages: Record<string, any> = {};
+    if (!deals.length) return [];
+    const stagesDict: Record<string, any> = {};
     deals.forEach(d => {
-      const stage = d.stage_id; // In real app we should join with stage names
-      if (!stages[stage]) stages[stage] = { name: stage, value: 0 };
-      stages[stage].value += 1;
+      const stage = d.stage_id || 'Senza Stage'; 
+      if (!stagesDict[stage]) stagesDict[stage] = { name: stage, value: 0 };
+      stagesDict[stage].value += 1;
     });
-    return Object.values(stages);
+    return Object.values(stagesDict).sort((a: any, b: any) => b.value - a.value);
   }, [deals]);
 
   const exportToCSV = () => {
@@ -159,6 +177,15 @@ export const CRMReports: React.FC<CRMReportsProps> = ({ pipeline }) => {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (isLoading && deals.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-[#f8fafc] p-8">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Caricamento Analisi...</p>
+      </div>
+    );
+  }
 
   const COLORS = ['#2FC6F6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 

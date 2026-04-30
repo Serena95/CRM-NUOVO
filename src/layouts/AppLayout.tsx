@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import { 
   Building, 
   UserPlus, 
@@ -12,19 +14,17 @@ import {
   CheckSquare, 
   MessageSquare, 
   Calendar as CalendarIcon, 
-  Settings, 
+  Settings as SettingsIcon, 
   LogOut,
-  Search,
-  Bell,
+  X,
   Menu,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
-  X,
   Plus,
   HelpCircle,
   Clock,
   FileText,
-  FileEdit,
   HardDrive,
   Mail,
   Target,
@@ -32,35 +32,23 @@ import {
   Settings2,
   TrendingUp,
   Grid,
-  MoreHorizontal,
-  Info,
-  Headphones,
   Home,
   BarChart3,
   Activity,
   PieChart,
   Layers,
-  FileCheck,
   Share2,
-  History,
   Inbox,
   Send,
   FileSignature,
-  MailSearch,
   Users2,
-  FolderKanban,
   GanttChart,
-  Megaphone,
   Smartphone,
-  MousePointerClick,
+  Megaphone,
   Workflow,
   Bot,
-  Timer,
-  Globe,
   Store,
   ShieldCheck,
-  UserCog,
-  Database,
   PhoneCall,
   Hash,
   Video,
@@ -68,17 +56,14 @@ import {
   Folder,
   FolderPlus,
   GitBranch,
-  Sparkles,
-  Compass,
-  PlusCircle
+  Headphones,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import ChatAgente from './crm/ChatAgente';
-import NotificationCenter from './NotificationCenter';
+import ChatAgente from '../components/crm/ChatAgente';
+import NotificationCenter from '../components/NotificationCenter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -94,7 +79,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
-import { GlobalSearch } from './crm/GlobalSearch';
+import { GlobalSearch } from '../components/crm/GlobalSearch';
+import { useCRMPermissions } from '@/hooks/useCRMPermissions';
+import { useCRMStore } from '@/stores/crmStore';
+import { format } from 'date-fns';
 
 const ICONS = [
   { name: 'DollarSign', icon: DollarSign },
@@ -106,22 +94,58 @@ const ICONS = [
   { name: 'Workflow', icon: Workflow },
 ];
 
-interface LayoutProps {
-  children: React.ReactNode;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-}
+const AppLayout: React.FC = () => {
+  const { profile, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Derive activeTab from current path
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const activeTab = pathParts[0] || 'dashboard';
+  const subTab = pathParts[1] || '';
+  const currentActive = subTab ? `${activeTab}-${subTab}` : activeTab;
 
-import { useCRMPermissions } from '@/hooks/useCRMPermissions';
-import { useCRMStore } from '@/stores/crmStore';
-
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) => {
-  const { profile, tenant, logout } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['crm', 'tasks']);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['crm', 'tasks', 'dashboard']);
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const { role } = useCRMPermissions();
   const { smartProcesses } = useCRMStore();
+  const crmScrollRef = useDraggableScroll();
+
+  const isCRM = location.pathname.includes('/crm');
+
+  const crmTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/crm/dashboard' },
+    { id: 'leads', label: 'Lead', icon: Target, path: '/crm/leads' },
+    { id: 'affari', label: 'Affari', icon: Briefcase, path: '/crm/affari' },
+    { id: 'contacts', label: 'Contatti', icon: Users, path: '/crm/contacts' },
+    { id: 'companies', label: 'Aziende', icon: Building, path: '/crm/companies' },
+    { id: 'tasks', label: 'Task', icon: CheckSquare, path: '/crm/tasks' },
+    { id: 'calendar', label: 'Calendario', icon: CalendarIcon, path: '/crm/calendario' },
+    { id: 'analytics', label: 'Analisi', icon: BarChart3, path: '/crm/analytics' },
+    { id: 'automations', label: 'Automazioni', icon: Zap, path: '/crm/automazioni' },
+    { id: 'settings', label: 'Configura', icon: Settings2, path: '/crm/configurazione' },
+  ];
+
+  const setActiveTab = (tab: string) => {
+    // Basic routing logic
+    if (tab === 'dashboard-home' || tab === 'dashboard') {
+      navigate('/dashboard');
+    } else if (tab === 'feed') {
+      navigate('/feed');
+    } else if (['leads', 'contacts', 'companies', 'affari', 'crm', 'tasks'].includes(tab)) {
+      if (tab === 'tasks') navigate('/crm/tasks');
+      else navigate(`/crm/${tab}`);
+    } else if (tab.startsWith('smart-process-')) {
+      navigate(`/crm/${tab}`);
+    } else if (tab.startsWith('dashboard-')) {
+      navigate(`/dashboard/${tab.replace('dashboard-', '')}`);
+    } else {
+      // Fallback for others
+      navigate(`/${tab.replace('-', '/')}`);
+    }
+  };
 
   const toggleMenu = (id: string) => {
     setExpandedMenus(prev => 
@@ -130,8 +154,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
   };
 
   const getContextualBubbles = () => {
-    const isCRM = activeTab === 'crm' || activeTab === 'leads' || activeTab === 'deals' || activeTab === 'contacts' || activeTab === 'companies' || activeTab.startsWith('nexus-') || activeTab.startsWith('pipeline-') || activeTab === 'preventivi' || activeTab === 'nexus-preventivi';
-    const isTasks = activeTab.startsWith('tasks');
+    const isCRM = location.pathname.includes('/crm');
+    const isTasks = location.pathname.includes('/tasks');
 
     if (isCRM) {
       return [
@@ -139,7 +163,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         { id: 'new-deal', icon: DollarSign, color: 'bg-emerald-500', label: 'Nuovo Affare' },
         { id: 'new-contact', icon: Users, color: 'bg-amber-500', label: 'Nuovo Contatto' },
         { id: 'new-company', icon: Building, color: 'bg-purple-500', label: 'Nuova Azienda' },
-        { id: 'crm-settings', icon: Settings, color: 'bg-slate-600', label: 'Impostazioni CRM' }
+        { id: 'crm-settings', icon: SettingsIcon, color: 'bg-slate-600', label: 'Impostazioni CRM' }
       ];
     }
 
@@ -149,7 +173,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         { id: 'new-project', icon: Briefcase, color: 'bg-blue-500', label: 'Nuovo Progetto' },
         { id: 'tasks-kanban', icon: Grid, color: 'bg-emerald-500', label: 'Vista Kanban' },
         { id: 'tasks-gantt', icon: GanttChart, color: 'bg-amber-500', label: 'Vista Gantt' },
-        { id: 'tasks-settings', icon: Settings, color: 'bg-slate-600', label: 'Impostazioni Task' }
+        { id: 'tasks-settings', icon: SettingsIcon, color: 'bg-slate-600', label: 'Impostazioni Task' }
       ];
     }
 
@@ -159,7 +183,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       { id: 'calendar', icon: CalendarIcon, color: 'bg-emerald-500', label: 'Calendario' },
       { id: 'feed', icon: Layers, color: 'bg-amber-500', label: 'Feed' },
       { id: 'drive', icon: HardDrive, color: 'bg-purple-500', label: 'Drive' },
-      { id: 'settings', icon: Settings, color: 'bg-slate-600', label: 'Impostazioni' }
+      { id: 'settings', icon: SettingsIcon, color: 'bg-slate-600', label: 'Impostazioni' }
     ];
   };
 
@@ -180,37 +204,25 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       case 'new-task':
         window.dispatchEvent(new CustomEvent('tasks:openCreate'));
         break;
-      case 'chat':
-        setActiveTab('chat');
-        break;
-      case 'calendar':
-        setActiveTab('calendar');
-        break;
-      case 'feed':
-        setActiveTab('feed');
-        break;
-      case 'drive':
-        setActiveTab('drive');
-        break;
+      case 'chat': navigate('/chat'); break;
+      case 'calendar': navigate('/calendar'); break;
+      case 'feed': navigate('/feed'); break;
+      case 'drive': navigate('/drive'); break;
       case 'settings':
       case 'crm-settings':
       case 'tasks-settings':
-        setActiveTab('settings');
+        navigate('/settings');
         break;
-      case 'tasks-kanban':
-        setActiveTab('tasks-kanban');
-        break;
-      case 'tasks-gantt':
-        setActiveTab('tasks-gantt');
-        break;
+      case 'tasks-kanban': navigate('/tasks/kanban'); break;
+      case 'tasks-gantt': navigate('/tasks/gantt'); break;
     }
   };
 
   const handleDealClick = (dealId: string, structureSlug?: string) => {
     if (structureSlug) {
-      setActiveTab(`pipeline-${structureSlug}`);
+      navigate(`/crm/pipeline-${structureSlug}`);
     } else {
-      setActiveTab('affari');
+      navigate('/crm/affari');
     }
     
     setTimeout(() => {
@@ -232,10 +244,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
     { id: 'crm', label: 'CRM', icon: Briefcase, subItems: [
       { id: 'crm-dashboard', label: 'Dashboard commerciale', icon: LayoutDashboard },
       { id: 'feed', label: 'Feed attività', icon: Activity },
-      { id: 'leads', label: 'Lead', icon: UserPlus },
+      { id: 'leads', label: 'Lead', icon: Target },
       { id: 'contacts', label: 'Contatti', icon: Users },
       { id: 'companies', label: 'Aziende', icon: Building },
-      { id: 'affari', label: 'Affari', icon: DollarSign },
+      { id: 'affari', label: 'Affari', icon: Briefcase },
       ...smartProcesses.map(p => {
         const IconComp = ICONS.find(i => i.name === p.icon)?.icon || DollarSign;
         return {
@@ -314,7 +326,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       { id: 'apps-marketplace', label: 'Marketplace app', icon: Store },
       { id: 'apps-integrations', label: 'Integrazioni', icon: Layers },
     ], roles: ['admin'] },
-    { id: 'settings', label: 'Impostazioni', icon: Settings, subItems: [
+    { id: 'settings', label: 'Impostazioni', icon: SettingsIcon, subItems: [
       { id: 'settings-users', label: 'Utenti', icon: Users },
       { id: 'settings-roles', label: 'Ruoli', icon: ShieldCheck },
       { id: 'settings-permissions', label: 'Permessi', icon: ShieldCheck },
@@ -328,11 +340,17 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
   });
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full nexus-sidebar-gradient text-white/70">
-      <div className="p-6 flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center text-white font-bold">N</div>
-          <span className="font-bold text-xl tracking-tight text-white">Nexus</span>
+    <div className={cn(
+      "flex flex-col h-full nexus-sidebar-gradient text-white/70 transition-all duration-300",
+      isSidebarCollapsed ? "w-20" : "w-60"
+    )}>
+      <div className={cn(
+        "p-6 flex items-center justify-between gap-3 shrink-0",
+        isSidebarCollapsed && "flex-col p-4"
+      )}>
+        <div className="flex items-center gap-3 cursor-pointer overflow-hidden" onClick={() => navigate('/dashboard')}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold shrink-0 bg-[#2FC6F6]">N</div>
+          {!isSidebarCollapsed && <span className="font-bold text-xl tracking-tight text-white whitespace-nowrap">Nexus</span>}
         </div>
         <Button 
           variant="ghost" 
@@ -347,49 +365,68 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       <nav className="flex-1 px-4 space-y-0.5 overflow-y-auto nexus-scrollbar py-4">
         {filteredNavItems.map((item) => (
           <div key={item.id} className="mb-1">
-            <button
-              onClick={() => {
-                if (item.subItems) {
-                  toggleMenu(item.id);
-                  if (item.id === 'crm' && activeTab !== 'affari') {
-                    setActiveTab('affari');
-                  }
-                } else {
-                  setActiveTab(item.id);
-                  setIsSidebarOpen(false);
-                }
-              }}
-              className={cn(
-                "w-full flex items-center justify-between px-3 py-2 rounded-md transition-all text-xs font-medium group",
-                (activeTab === item.id || (item.subItems?.some(s => s.id === activeTab)))
-                  ? "bg-white/10 text-white shadow-sm" 
-                  : "hover:bg-white/5 hover:text-white"
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    if (isSidebarCollapsed) {
+                      setIsSidebarCollapsed(false);
+                      return;
+                    }
+                    if (item.subItems) {
+                      toggleMenu(item.id);
+                      if (item.id === 'crm' && !location.pathname.includes('/crm')) {
+                        navigate('/crm/affari');
+                      }
+                    } else {
+                      navigate(`/${item.id}`);
+                      setIsSidebarOpen(false);
+                    }
+                  }}
+                  className={cn(
+                    "w-full flex items-center justify-between transition-all text-xs font-medium group",
+                    isSidebarCollapsed ? "p-2 justify-center rounded-lg" : "px-3 py-2 rounded-md",
+                    (location.pathname.includes(`/${item.id}`) || (item.subItems?.some(s => location.pathname.includes(s.id))))
+                      ? "bg-white/10 text-white shadow-sm" 
+                      : "hover:bg-white/5 hover:text-white"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon size={16} className={cn(
+                      "transition-colors shrink-0",
+                      (location.pathname.includes(`/${item.id}`) || (item.subItems?.some(s => location.pathname.includes(s.id)))) ? "text-[#2FC6F6]" : "group-hover:text-[#2FC6F6]"
+                    )} />
+                    {!isSidebarCollapsed && item.label}
+                  </div>
+                  {!isSidebarCollapsed && item.subItems && (
+                    expandedMenus.includes(item.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+                  )}
+                </button>
+              </TooltipTrigger>
+              {isSidebarCollapsed && (
+                <TooltipContent side="right">
+                  {item.label}
+                </TooltipContent>
               )}
-            >
-              <div className="flex items-center gap-3">
-                <item.icon size={16} className={cn(
-                  "transition-colors",
-                  (activeTab === item.id || (item.subItems?.some(s => s.id === activeTab))) ? "text-brand-yellow" : "group-hover:text-brand-yellow"
-                )} />
-                {item.label}
-              </div>
-              {item.subItems && (
-                expandedMenus.includes(item.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />
-              )}
-            </button>
+            </Tooltip>
 
-            {item.subItems && expandedMenus.includes(item.id) && (
+            {!isSidebarCollapsed && item.subItems && expandedMenus.includes(item.id) && (
               <div className="mt-1 ml-4 pl-4 border-l border-white/10 space-y-0.5">
                 {item.subItems.map((sub) => (
                   <button
                     key={sub.id}
                     onClick={() => {
-                      setActiveTab(sub.id);
-                      setIsSidebarOpen(false);
+                      if (sub.id === 'crm-new-process') {
+                        // Special case handle in component probably or trigger event
+                        window.dispatchEvent(new CustomEvent('crm:openSmartProcess'));
+                      } else {
+                        setActiveTab(sub.id);
+                        setIsSidebarOpen(false);
+                      }
                     }}
                     className={cn(
-                      "w-full flex items-center justify-between px-3 py-1.5 rounded-md transition-all text-[11px] font-medium group",
-                      activeTab === sub.id
+                      "w-full flex items-center justify-between px-3 py-1.5 rounded-md transition-all text-[11px] font-medium group text-left",
+                      location.pathname.includes(sub.id) || currentActive === sub.id
                         ? "text-white bg-white/5" 
                         : "text-white/50 hover:text-white hover:bg-white/5"
                     )}
@@ -397,15 +434,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
                     <div className="flex items-center gap-3">
                       <sub.icon size={14} className={cn(
                         "transition-colors",
-                        activeTab === sub.id ? "text-blue-400" : "group-hover:text-blue-400"
+                        location.pathname.includes(sub.id) || currentActive === sub.id ? "text-blue-400" : "group-hover:text-blue-400"
                       )} />
                       {sub.label}
                     </div>
-                    {(sub as any).badge !== undefined && (sub as any).badge > 0 && (
-                      <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">
-                        {(sub as any).badge}
-                      </span>
-                    )}
                   </button>
                 ))}
               </div>
@@ -415,9 +447,20 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       </nav>
 
       <div className="p-4 border-t border-white/10 shrink-0">
-        <Button variant="ghost" className="w-full justify-start text-white/50 hover:text-white hover:bg-white/5 text-xs">
-          <Settings size={14} className="mr-2" />
-          Configura menu
+        <Button 
+          variant="ghost" 
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className={cn(
+            "w-full text-white/50 hover:text-white hover:bg-white/5 text-xs",
+            isSidebarCollapsed ? "justify-center px-0" : "justify-start px-3"
+          )}
+        >
+          {isSidebarCollapsed ? <ChevronRight size={14} /> : (
+            <>
+              <Menu size={14} className="mr-2" />
+              Riduci sidebar
+            </>
+          )}
         </Button>
       </div>
     </div>
@@ -434,7 +477,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
       )}
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex w-60 flex-col z-30 shrink-0">
+      <aside className={cn(
+        "hidden lg:flex flex-col z-30 shrink-0 transition-all duration-300",
+        isSidebarCollapsed ? "w-20" : "w-60"
+      )}>
         <SidebarContent />
       </aside>
 
@@ -460,22 +506,25 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
               <Menu size={20} />
             </Button>
 
-            <div className="xs:hidden">
-              <NotificationCenter onDealClick={handleDealClick} isMobile={true} />
-            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="hidden lg:flex text-white/70 hover:text-white" 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            >
+              {isSidebarCollapsed ? <Plus size={20} className="rotate-45" /> : <Menu size={20} />}
+            </Button>
 
             <GlobalSearch />
           </div>
 
           <div className="flex items-center gap-2 lg:gap-4">
             <div className="hidden xl:flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-white/70 backdrop-blur-md">
-              <Clock size={14} className="text-brand-yellow" />
-              <span>08:45</span>
+              <Clock size={14} className="text-[#2FC6F6]" />
+              <span>{format(new Date(), 'HH:mm')}</span>
             </div>
 
-            <div className="hidden xs:flex">
-              <NotificationCenter onDealClick={handleDealClick} isMobile={false} />
-            </div>
+            <NotificationCenter onDealClick={handleDealClick} />
 
             <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hidden sm:flex">
               <HelpCircle size={20} />
@@ -492,14 +541,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
                 <span className="text-sm font-black text-slate-800 hidden md:inline truncate max-w-[100px]">{profile?.displayName}</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Account</DropdownMenuLabel>
-                </DropdownMenuGroup>
+                <DropdownMenuLabel>Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setActiveTab('settings')}>Profilo</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setActiveTab('settings')}>Impostazioni</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/settings')}>Profilo</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/settings')}>Impostazioni</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="text-red-600">
+                <DropdownMenuItem onClick={async () => { await logout(); navigate('/login'); }} className="text-red-600">
                   <LogOut size={16} className="mr-2" />
                   Esci
                 </DropdownMenuItem>
@@ -507,7 +554,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
             </DropdownMenu>
 
             <Button 
-              onClick={() => setActiveTab('settings-users')}
+              onClick={() => navigate('/settings/invite')}
               className="bg-[#2FC6F6] hover:bg-[#1eb0e0] text-white font-bold rounded-full px-6 hidden sm:flex"
             >
               INVITA
@@ -515,30 +562,81 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
           </div>
         </header>
 
+        {/* Horizontal CRM Sidebar Nav */}
+        <AnimatePresence>
+          {isCRM && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 64, opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-white border-b border-slate-200 shadow-sm z-20 relative group/crmnav"
+            >
+              <div className="max-w-full h-full relative">
+                <div 
+                  ref={crmScrollRef}
+                  className="max-w-full px-6 h-full flex items-center gap-8 overflow-x-auto thin-scrollbar cursor-grab active:cursor-grabbing select-none scroll-smooth pb-2"
+                >
+                  {crmTabs.map((tab) => {
+                    const pathBase = tab.path.split('/').pop() || '';
+                    const isActive = location.pathname.includes(tab.id) || location.pathname.includes(pathBase);
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => navigate(tab.path)}
+                        className={cn(
+                          "h-full flex items-center gap-2 px-1 relative text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap group shrink-0",
+                          isActive ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
+                        )}
+                      >
+                        <tab.icon size={14} className={cn("transition-colors", isActive ? "text-blue-600" : "text-slate-300 group-hover:text-slate-500")} />
+                        {tab.label}
+                        {isActive && (
+                          <motion.div 
+                            layoutId="activeHorizontalTab"
+                            className="absolute bottom-0 left-0 right-0 h-[3px] bg-blue-600 rounded-t-full"
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {/* Scroll indicators / Arrows */}
+                <button 
+                  onClick={() => crmScrollRef.current?.scrollBy({ left: -200, behavior: 'smooth' })}
+                  className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white via-white/80 to-transparent flex items-center justify-start pl-1 text-slate-400 hover:text-blue-600 opacity-0 group-hover/crmnav:opacity-100 transition-opacity z-10"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button 
+                  onClick={() => crmScrollRef.current?.scrollBy({ left: 200, behavior: 'smooth' })}
+                  className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white via-white/80 to-transparent flex items-center justify-end pr-1 text-slate-400 hover:text-blue-600 opacity-0 group-hover/crmnav:opacity-100 transition-opacity z-10"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Page Area */}
-        <div className="flex-1 overflow-auto bg-[#f5f7fb] w-full max-w-full">
-          {children}
+        <div className="flex-1 overflow-auto bg-[#f5f7fb] w-full max-w-full relative">
+           <Outlet />
         </div>
+
 
         {/* AI Agent Bubble - Bottom Right */}
         <div className="fixed right-4 bottom-24 lg:bottom-8 z-[70]">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                onClick={() => setIsAIChatOpen(!isAIChatOpen)}
-                size="icon" 
-                className={cn(
-                  "w-12 h-12 lg:w-16 lg:h-16 rounded-full shadow-2xl hover:scale-110 transition-transform text-white border-2 border-white bg-brand-blue z-10",
-                  isAIChatOpen && "rotate-90"
-                )}
-              >
-                {isAIChatOpen ? <X size={28} /> : <Bot size={28} />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left" className="bg-slate-900 text-white border-none font-bold text-[10px] uppercase tracking-widest">
-              Assistente AI
-            </TooltipContent>
-          </Tooltip>
+           <Button 
+             onClick={() => setIsAIChatOpen(!isAIChatOpen)}
+             size="icon" 
+             className={cn(
+               "w-12 h-12 lg:w-16 lg:h-16 rounded-full shadow-2xl hover:scale-110 transition-transform text-white border-2 border-white bg-brand-blue z-10",
+               isAIChatOpen && "rotate-90"
+             )}
+           >
+             {isAIChatOpen ? <X size={28} /> : <Bot size={28} />}
+           </Button>
         </div>
 
         {/* AI Chat Popover */}
@@ -559,4 +657,4 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
   );
 };
 
-export default Layout;
+export default AppLayout;

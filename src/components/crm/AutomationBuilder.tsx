@@ -12,6 +12,7 @@ import {
   UserPlus, 
   Webhook, 
   ChevronDown, 
+  ChevronLeft,
   GripVertical,
   X,
   Zap,
@@ -110,7 +111,7 @@ export const AutomationBuilder: React.FC<AutomationBuilderProps> = ({ pipeline, 
         trigger,
         actions,
         is_active: true
-      });
+      }, pipeline.workspace_id);
       toast.success('Automazione salvata con successo');
       onSave();
       onClose();
@@ -126,8 +127,9 @@ export const AutomationBuilder: React.FC<AutomationBuilderProps> = ({ pipeline, 
       {/* Top Header */}
       <div className="h-20 bg-white border-b border-slate-200 px-6 sm:px-8 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-4 sm:gap-6">
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-            <X size={20} className="text-slate-400" />
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors flex items-center gap-2 group">
+            <ChevronLeft size={20} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+            <span className="text-xs font-bold text-slate-400 group-hover:text-blue-600 uppercase tracking-widest hidden sm:inline">Indietro</span>
           </button>
           <div className="hidden sm:block h-8 w-px bg-slate-100" />
           <div className="flex flex-col">

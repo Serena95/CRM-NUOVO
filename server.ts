@@ -35,16 +35,31 @@ const firebaseConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'firebase
 const app_firebase = initializeApp(firebaseConfig);
 const db = getFirestore(app_firebase, firebaseConfig.firestoreDatabaseId);
 
+// Helper for safe stringify of potentially cyclic objects
+function safeJsonStringify(obj: any): string {
+  const cache = new Set();
+  return JSON.stringify(obj, (_key, value) => {
+    if (typeof value === 'object' && value !== null) {
+      if (cache.has(value)) {
+        return '[Circular]';
+      }
+      cache.add(value);
+    }
+    return value;
+  });
+}
+
 // Webhook Helper
 async function triggerWebhook(event: string, payload: any) {
   const webhookUrl = process.env.CRM_WEBHOOK_URL;
   if (!webhookUrl) return;
 
   try {
+    const body = safeJsonStringify({ event, payload, timestamp: new Date().toISOString() });
     await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event, payload, timestamp: new Date().toISOString() })
+      body
     });
     console.log(`Webhook triggered: ${event}`);
   } catch (err) {

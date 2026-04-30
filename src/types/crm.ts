@@ -148,6 +148,7 @@ export interface CRMCustomFieldDefinition {
 
 export interface CRMAutomation {
   id: string;
+  workspace_id: string;
   pipeline_id: string;
   stage_id: string;
   name: string;
@@ -203,6 +204,8 @@ export interface PreanalysisResult {
     vat?: string;
     industry?: string;
     size?: string;
+    email?: string;
+    phone?: string;
   };
   contact_data: {
     name: string;

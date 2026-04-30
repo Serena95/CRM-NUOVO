@@ -21,6 +21,8 @@ import {
   Phone, 
   Mail, 
   TrendingUp, 
+  Target,
+  Briefcase,
   User,
   AlertCircle,
   CheckCircle2,
@@ -121,6 +123,8 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : {};
 
+  const isLead = structure?.slug === 'leads';
+
   const cardStyle = {
     ...style,
     borderLeftColor: structure?.color || '#cbd5e1'
@@ -169,9 +173,26 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
             <h3 className="font-black text-slate-800 text-[11px] md:text-[12px] xl:text-[13px] leading-tight uppercase tracking-tight truncate">
               {res.company_data.name}
             </h3>
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-              {res.request_type}
-            </span>
+            <div className="flex items-center gap-1 mt-0.5">
+               {isLead ? <Target size={10} className="text-purple-500" /> : <Briefcase size={10} className="text-blue-500" />}
+               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">
+                 {res.request_type || (isLead ? 'Lead da contattare' : 'Affare')}
+               </span>
+            </div>
+            {isLead && (
+              <div className="flex flex-col gap-0.5 mt-2">
+                {res.company_data.email && (
+                  <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-medium">
+                    <Mail size={10} className="text-slate-300" /> {res.company_data.email}
+                  </div>
+                )}
+                {res.company_data.phone && (
+                  <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-medium">
+                    <Phone size={10} className="text-slate-300" /> {res.company_data.phone}
+                  </div>
+                )}
+              </div>
+            )}
             {getInactivityData(deal, currentStage?.name || '')?.isExpired && (
               <Badge className="mt-1 bg-red-50 text-red-600 border-red-100 text-[8px] xl:text-[9px] font-black uppercase flex items-center gap-1 w-fit">
                 <AlertTriangle size={8} />
@@ -242,9 +263,26 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
           <h4 className="text-[11px] md:text-[12px] xl:text-[13px] font-black text-slate-800 leading-tight uppercase tracking-tight truncate">
             {deal.company || deal.title}
           </h4>
-          <span className="text-[9px] font-bold text-slate-400 mt-0.5 xl:mt-1 uppercase tracking-widest truncate">
-            {structure?.name || 'Affare'}
-          </span>
+          <div className="flex items-center gap-1 mt-0.5 xl:mt-1">
+             {isLead ? <Target size={10} className="text-purple-500" /> : <Briefcase size={10} className="text-blue-500" />}
+             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">
+               {structure?.name || (isLead ? 'Lead' : 'Affare')}
+             </span>
+          </div>
+          {isLead && (
+            <div className="flex flex-col gap-0.5 mt-2">
+              {deal.email && (
+                <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-medium">
+                  <Mail size={10} className="text-slate-300" /> {deal.email}
+                </div>
+              )}
+              {deal.phone && (
+                <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-medium">
+                  <Phone size={10} className="text-slate-300" /> {deal.phone}
+                </div>
+              )}
+            </div>
+          )}
           {getInactivityData(deal, currentStage?.name || '')?.isExpired && (
             <Badge className="mt-1 bg-red-50 text-red-600 border-red-100 text-[8px] xl:text-[10px] font-black uppercase flex items-center gap-1 w-fit">
               <AlertTriangle size={8} className="xl:h-3 xl:w-3" />
@@ -254,9 +292,11 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
         </div>
         
         {/* Value on top right for desktop for better visual balance */}
-        <div className="hidden xl:block shrink-0">
-          <span className="text-[12px] font-black text-emerald-600 tracking-tight">€{deal.value.toLocaleString()}</span>
-        </div>
+        {!isLead && (
+          <div className="hidden xl:block shrink-0">
+            <span className="text-[12px] font-black text-emerald-600 tracking-tight">€{deal.value.toLocaleString()}</span>
+          </div>
+        )}
 
         {deal.preanalysis_result && (
           <Badge className={cn(
@@ -302,7 +342,9 @@ export const DealCard: React.FC<DealCardProps> = ({ deal, isPreanalysis }) => {
       <div className="flex items-center justify-between pt-2 border-t border-slate-50 mt-auto">
         <div className="flex flex-col xl:flex-row xl:items-center gap-1 xl:gap-2">
           {/* Lower value display for Tablet/Mobile */}
-          <span className="xl:hidden text-[11px] md:text-[11px] font-black text-emerald-600 tracking-tight">€{deal.value.toLocaleString()}</span>
+          {!isLead && (
+            <span className="xl:hidden text-[11px] md:text-[11px] font-black text-emerald-600 tracking-tight">€{deal.value.toLocaleString()}</span>
+          )}
           
           <div className="flex items-center gap-1.5 text-[8px] xl:text-[9px] font-black text-slate-300 uppercase tracking-tight">
              <Calendar size={10} />

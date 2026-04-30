@@ -27,6 +27,18 @@
       payload.formId = "finanza-agevolata";
       payload.source = window.location.href;
 
+      // Safe stringify helper
+      const safeJsonStringify = (obj) => {
+        const cache = new Set();
+        return JSON.stringify(obj, (key, value) => {
+          if (typeof value === 'object' && value !== null) {
+            if (cache.has(value)) return '[Circular]';
+            cache.add(value);
+          }
+          return value;
+        });
+      };
+
       try {
         // 4 Invia i dati al CRM
         const response = await fetch(`${baseUrl}/api/public/form`, {
@@ -34,7 +46,7 @@
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify(payload)
+          body: safeJsonStringify(payload)
         });
 
         if (response.ok) {

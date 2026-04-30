@@ -1,4 +1,5 @@
 export const CRM_STRUCTURES = [
+  { name: 'Leads', slug: 'leads', color: '#6133FF' },
   { name: 'Finanza agevolata', slug: 'finanza-agevolata', color: '#2FC6F6' },
   { name: 'Servizi digitali', slug: 'servizi-digitali', color: '#FF5722' },
   { name: 'Consulenze', slug: 'consulenze', color: '#4CAF50' },
@@ -8,6 +9,14 @@ export const CRM_STRUCTURES = [
   { name: 'Formazione', slug: 'formazione', color: '#FFC107' },
   { name: 'Coworking', slug: 'coworking', color: '#607D8B' },
   { name: 'Prenotazione online', slug: 'prenotazione-online', color: '#3F51B5' },
+];
+
+export const LEADS_STAGES = [
+  { name: 'Nuovo Lead', position: 1, is_won: false, is_lost: false, color: '#f1f5f9' },
+  { name: 'Contattato', position: 2, is_won: false, is_lost: false, color: '#e0f2fe' },
+  { name: 'In Qualifica', position: 3, is_won: false, is_lost: false, color: '#fef3c7' },
+  { name: 'Qualificato', position: 4, is_won: true, is_lost: false, color: '#dcfce7' },
+  { name: 'Lead Perso', position: 5, is_won: false, is_lost: true, color: '#fee2e2' },
 ];
 
 export const CRM_PIPELINE_STAGES = [

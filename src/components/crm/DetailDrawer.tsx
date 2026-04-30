@@ -199,9 +199,52 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({ isOpen, onClose, ite
                   {item.company || item.title || 'Senza Nome'}
                 </h2>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-600 border-none text-[7px] md:text-[8px] font-black px-1.5 py-0">
+                  <Badge variant="outline" className={cn(
+                    "border-none text-[7px] md:text-[8px] font-black px-1.5 py-0",
+                    type === 'lead' ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"
+                  )}>
                     {type.toUpperCase()}
                   </Badge>
+                  {type === 'lead' && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-4 p-0 text-[8px] font-black uppercase text-emerald-600 flex items-center gap-1 hover:bg-transparent">
+                          <TrendingUp size={10} /> Converti in Affare
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-3 rounded-2xl shadow-2xl border-slate-100 z-[100]">
+                         <div className="space-y-3">
+                           <div className="space-y-1">
+                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Conversione Lead</h4>
+                             <p className="text-[11px] font-medium text-slate-600 leading-tight">Seleziona in quale pipeline spostare l'affare qualificato.</p>
+                           </div>
+                           <div className="space-y-1 max-h-48 overflow-y-auto no-scrollbar">
+                             {structures.filter(s => s.slug !== 'leads').map(s => (
+                               <button 
+                                 key={s.id} 
+                                 onClick={async () => {
+                                   try {
+                                     await supabaseCRMService.convertLeadToDeal(item.id, s.id);
+                                     toast.success(`Lead convertito in ${s.name}`);
+                                     onClose();
+                                     fetchInitialData(s.slug, true);
+                                   } catch (e) {
+                                     toast.error("Errore durante la conversione");
+                                   }
+                                 }}
+                                 className="w-full text-left p-2.5 rounded-xl hover:bg-slate-50 transition-all flex items-center gap-3 group"
+                               >
+                                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform" style={{ backgroundColor: s.color }}>
+                                    <TrendingUp size={14} />
+                                 </div>
+                                 <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">{s.name}</span>
+                               </button>
+                             ))}
+                           </div>
+                         </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                   <span className="text-[9px] md:text-[10px] text-slate-400 font-bold">ID: {item.id.slice(0, 8)}</span>
                   <div className="h-2 w-px bg-slate-200 mx-1" />
                   <button 

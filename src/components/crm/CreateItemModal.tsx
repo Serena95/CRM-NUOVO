@@ -86,6 +86,12 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({ isOpen, onClos
     else if (activeStructure) setSelectedPipelineId(activeStructure.id);
   }, [propPipelineId, activeStructure]);
 
+  const selectedStructure = useMemo(() => {
+    return structures.find(s => s.id === selectedPipelineId);
+  }, [structures, selectedPipelineId]);
+
+  const isLeadMode = selectedStructure?.slug === 'leads';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -178,12 +184,14 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({ isOpen, onClos
               </div>
 
               <div className="space-y-1.5 col-span-1 md:col-span-2">
-                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Azienda / Titolo</Label>
+                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                  {isLeadMode ? 'Titolo Lead / Azienda' : 'Azienda / Titolo'}
+                </Label>
                 <Input 
                   required
                   value={formData.company}
                   onChange={(e) => setFormData({...formData, company: e.target.value})}
-                  placeholder="Nome dell'azienda o titolo del deal"
+                  placeholder={isLeadMode ? "Es: Nuovo contatto fiera o Nome Azienda" : "Nome dell'azienda o titolo del deal"}
                   className="h-12 rounded-2xl border-slate-100 bg-white shadow-sm focus:ring-blue-100 text-sm font-bold"
                 />
               </div>
@@ -198,15 +206,17 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({ isOpen, onClos
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Valore Atteso (€)</Label>
-                <Input 
-                  type="number"
-                  value={formData.value}
-                  onChange={(e) => setFormData({...formData, value: Number(e.target.value)})}
-                  className="h-12 rounded-2xl border-slate-100 bg-white shadow-sm focus:ring-blue-100 text-sm font-black text-emerald-600"
-                />
-              </div>
+              {!isLeadMode && (
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Valore Atteso (€)</Label>
+                  <Input 
+                    type="number"
+                    value={formData.value}
+                    onChange={(e) => setFormData({...formData, value: Number(e.target.value)})}
+                    className="h-12 rounded-2xl border-slate-100 bg-white shadow-sm focus:ring-blue-100 text-sm font-black text-emerald-600"
+                  />
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Email</Label>
@@ -272,7 +282,7 @@ export const CreateItemModal: React.FC<CreateItemModalProps> = ({ isOpen, onClos
               disabled={loading}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl h-12 text-[10px] uppercase tracking-widest shadow-xl shadow-blue-100"
             >
-              {loading ? 'CREAZIONE...' : 'CREA AFFARE'}
+              {loading ? 'CREAZIONE...' : isLeadMode ? 'CREA LEAD' : 'CREA AFFARE'}
             </Button>
           </DialogFooter>
         </form>

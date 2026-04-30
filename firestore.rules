@@ -116,23 +116,23 @@ service cloud.firestore {
     }
     
     match /crm_deals/{id} {
-      allow read: if isMember(resource.data.workspace_id);
+      allow read: if isAdmin() || isMember(resource.data.workspace_id);
       allow create: if isMember(incoming().workspace_id);
-      allow update: if isMember(existing().workspace_id);
+      allow update: if isAdmin() || isMember(existing().workspace_id);
       allow delete: if isAdmin() || isMember(existing().workspace_id);
     }
 
     match /crm_contacts/{id} {
-      allow read: if isMember(resource.data.workspace_id);
+      allow read: if isAdmin() || isMember(resource.data.workspace_id);
       allow create: if isMember(incoming().workspace_id);
-      allow update: if isMember(existing().workspace_id);
+      allow update: if isAdmin() || isMember(existing().workspace_id);
       allow delete: if isAdmin() || isMember(existing().workspace_id);
     }
 
     match /crm_companies/{id} {
-      allow read: if isMember(resource.data.workspace_id);
+      allow read: if isAdmin() || isMember(resource.data.workspace_id);
       allow create: if isMember(incoming().workspace_id);
-      allow update: if isMember(existing().workspace_id);
+      allow update: if isAdmin() || isMember(existing().workspace_id);
       allow delete: if isAdmin() || isMember(existing().workspace_id);
     }
     

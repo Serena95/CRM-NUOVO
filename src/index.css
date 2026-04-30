@@ -126,6 +126,20 @@
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
+  .thin-scrollbar::-webkit-scrollbar {
+    height: 5px;
+  }
+  .thin-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+  .thin-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.3);
+    border-radius: 10px;
+  }
+  .thin-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.5);
+  }
 }
 
 /* TipTap Editor Styles */
